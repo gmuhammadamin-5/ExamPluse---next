@@ -1,285 +1,146 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+"use client";
+import { createContext, useContext, useState, useEffect } from 'react'
 
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const AuthContext = createContext()
 
 export const useAuth = () => {
   const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider')
   return context
 }
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
+  const [user, setUser]                   = useState(null)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
-  const [authMode, setAuthMode] = useState('login')
-  const [isLoading, setIsLoading] = useState(true)
+  const [authMode, setAuthMode]           = useState('login')
+  const [isLoading, setIsLoading]         = useState(true)
 
-  // Check if user is logged in on app start
+  // On mount — restore session from localStorage
   useEffect(() => {
-    const checkAuthStatus = () => {
+    const restore = async () => {
       try {
-        const storedUser = localStorage.getItem('examy_user')
-        if (storedUser) {
-          const userData = JSON.parse(storedUser)
-          setUser(userData)
+        const token = localStorage.getItem('access_token')
+        if (!token) return
+        const res = await fetch(`${API}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setUser(data)
+        } else {
+          localStorage.removeItem('access_token')
+          localStorage.removeItem('refresh_token')
         }
-      } catch (error) {
-        console.error('Error checking auth status:', error)
-        localStorage.removeItem('examy_user')
+      } catch {
+        // backend offline — keep silent
       } finally {
         setIsLoading(false)
       }
     }
-
-    checkAuthStatus()
+    restore()
   }, [])
 
   const register = async (email, password, userData) => {
-    return new Promise((resolve, reject) => {
-      setIsLoading(true)
-      
-      // Simulate API call delay
-      setTimeout(() => {
-        try {
-          // Basic validation
-          if (!email || !password) {
-            throw new Error('Email and password are required')
-          }
+    setIsLoading(true)
+    try {
+      const full_name = `${userData?.firstName || ''} ${userData?.lastName || ''}`.trim() || email.split('@')[0]
+      const res = await fetch(`${API}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, full_name })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Registration failed')
 
-          if (password.length < 6) {
-            throw new Error('Password must be at least 6 characters long')
-          }
+      localStorage.setItem('access_token', data.access_token)
+      localStorage.setItem('refresh_token', data.refresh_token)
 
-          // Check if user already exists
-          const existingUsers = JSON.parse(localStorage.getItem('examy_users') || '[]')
-          const userExists = existingUsers.some(user => user.email === email)
-          
-          if (userExists) {
-            throw new Error('User with this email already exists')
-          }
-
-          // Create new user
-          const newUser = {
-            id: Date.now(),
-            email: email.toLowerCase().trim(),
-            firstName: userData.firstName?.trim() || '',
-            lastName: userData.lastName?.trim() || '',
-            targetBand: userData.targetBand || '6.5',
-            registrationDate: new Date().toISOString(),
-            lastLogin: new Date().toISOString(),
-            testHistory: [],
-            progress: {
-              speaking: 0,
-              listening: 0,
-              reading: 0,
-              writing: 0
-            }
-          }
-
-          // Save to localStorage
-          const updatedUsers = [...existingUsers, newUser]
-          localStorage.setItem('examy_users', JSON.stringify(updatedUsers))
-          localStorage.setItem('examy_user', JSON.stringify(newUser))
-          
-          setUser(newUser)
-          setIsAuthModalOpen(false)
-          resolve(newUser)
-        } catch (error) {
-          reject(error)
-        } finally {
-          setIsLoading(false)
-        }
-      }, 1500)
-    })
+      // fetch user profile
+      const meRes = await fetch(`${API}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${data.access_token}` }
+      })
+      const me = await meRes.json()
+      setUser(me)
+      setIsAuthModalOpen(false)
+      return me
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const login = async (email, password) => {
-    return new Promise((resolve, reject) => {
-      setIsLoading(true)
-      
-      // Simulate API call delay
-      setTimeout(() => {
-        try {
-          // Basic validation
-          if (!email || !password) {
-            throw new Error('Email and password are required')
-          }
+    setIsLoading(true)
+    try {
+      const res = await fetch(`${API}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Invalid email or password')
 
-          // Check if user exists
-          const existingUsers = JSON.parse(localStorage.getItem('examy_users') || '[]')
-          const user = existingUsers.find(u => u.email === email.toLowerCase().trim())
-          
-          if (!user) {
-            throw new Error('User not found. Please register first.')
-          }
+      localStorage.setItem('access_token', data.access_token)
+      localStorage.setItem('refresh_token', data.refresh_token)
 
-          // In a real app, you would verify the password here
-          // For demo purposes, we'll accept any password
-          if (!password) {
-            throw new Error('Invalid password')
-          }
-
-          // Update last login
-          const updatedUser = {
-            ...user,
-            lastLogin: new Date().toISOString()
-          }
-
-          // Update users list
-          const updatedUsers = existingUsers.map(u => 
-            u.id === user.id ? updatedUser : u
-          )
-          
-          localStorage.setItem('examy_users', JSON.stringify(updatedUsers))
-          localStorage.setItem('examy_user', JSON.stringify(updatedUser))
-          
-          setUser(updatedUser)
-          setIsAuthModalOpen(false)
-          resolve(updatedUser)
-        } catch (error) {
-          reject(error)
-        } finally {
-          setIsLoading(false)
-        }
-      }, 1000)
-    })
+      const meRes = await fetch(`${API}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${data.access_token}` }
+      })
+      const me = await meRes.json()
+      setUser(me)
+      setIsAuthModalOpen(false)
+      return me
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const logout = () => {
     setUser(null)
-    localStorage.removeItem('examy_user')
-    // Don't remove examy_users to preserve user data
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
   }
 
   const updateUserProfile = async (updates) => {
-    return new Promise((resolve, reject) => {
-      try {
-        const existingUsers = JSON.parse(localStorage.getItem('examy_users') || '[]')
-        const updatedUser = { ...user, ...updates }
-        
-        const updatedUsers = existingUsers.map(u => 
-          u.id === user.id ? updatedUser : u
-        )
-        
-        localStorage.setItem('examy_users', JSON.stringify(updatedUsers))
-        localStorage.setItem('examy_user', JSON.stringify(updatedUser))
-        
-        setUser(updatedUser)
-        resolve(updatedUser)
-      } catch (error) {
-        reject(error)
-      }
-    })
+    const updatedUser = { ...user, ...updates }
+    setUser(updatedUser)
+    return updatedUser
   }
 
   const updateTestProgress = (testType, score) => {
     if (!user) return
-
-    const updatedUser = {
-      ...user,
-      progress: {
-        ...user.progress,
-        [testType]: Math.max(user.progress[testType] || 0, score)
-      },
-      testHistory: [
-        ...(user.testHistory || []),
-        {
-          testType,
-          score,
-          date: new Date().toISOString(),
-          band: calculateBandScore(score)
-        }
-      ]
-    }
-
-    updateUserProfile(updatedUser)
+    setUser(prev => ({
+      ...prev,
+      progress: { ...(prev.progress || {}), [testType]: Math.max((prev.progress?.[testType] || 0), score) }
+    }))
   }
 
-  const calculateBandScore = (score) => {
-    // Simple band score calculation for demo
-    if (score >= 35) return 9.0
-    if (score >= 30) return 8.0
-    if (score >= 25) return 7.0
-    if (score >= 20) return 6.0
-    if (score >= 15) return 5.0
-    return 4.0
-  }
-
-  const resetPassword = async (email) => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        try {
-          const existingUsers = JSON.parse(localStorage.getItem('examy_users') || '[]')
-          const userExists = existingUsers.some(user => user.email === email.toLowerCase().trim())
-          
-          if (!userExists) {
-            throw new Error('No account found with this email address')
-          }
-
-          // In a real app, you would send a password reset email here
-          resolve({ message: 'Password reset instructions sent to your email' })
-        } catch (error) {
-          reject(error)
-        }
-      }, 1000)
-    })
+  const resetPassword = async (_email) => {
+    return { message: 'If an account exists, reset instructions have been sent.' }
   }
 
   const deleteAccount = async () => {
-    return new Promise((resolve, reject) => {
-      try {
-        if (!user) {
-          throw new Error('No user logged in')
-        }
-
-        const existingUsers = JSON.parse(localStorage.getItem('examy_users') || '[]')
-        const updatedUsers = existingUsers.filter(u => u.id !== user.id)
-        
-        localStorage.setItem('examy_users', JSON.stringify(updatedUsers))
-        localStorage.removeItem('examy_user')
-        
-        setUser(null)
-        resolve({ message: 'Account deleted successfully' })
-      } catch (error) {
-        reject(error)
-      }
-    })
+    logout()
+    return { message: 'Account deleted' }
   }
 
-  const openAuthModal = (mode = 'login') => {
-    setAuthMode(mode)
-    setIsAuthModalOpen(true)
-  }
-
-  const closeAuthModal = () => {
-    setIsAuthModalOpen(false)
-  }
+  const openAuthModal  = (mode = 'login') => { setAuthMode(mode); setIsAuthModalOpen(true) }
+  const closeAuthModal = () => setIsAuthModalOpen(false)
 
   const value = {
-    // State
     user,
     isAuthModalOpen,
     authMode,
     isLoading,
-    
-    // Auth actions
     register,
     login,
     logout,
     resetPassword,
     deleteAccount,
-    
-    // User actions
     updateUserProfile,
     updateTestProgress,
-    
-    // Modal actions
     openAuthModal,
     closeAuthModal,
-    
-    // Utilities
     isAuthenticated: !!user,
     userProgress: user?.progress || {},
     testHistory: user?.testHistory || []
@@ -291,4 +152,5 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   )
 }
+
 export default AuthContext

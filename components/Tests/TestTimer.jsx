@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import '../../styles/App.css'
 
 const TestTimer = ({ duration, onTimeUp }) => {
   const [timeLeft, setTimeLeft] = useState(duration)

@@ -1,11 +1,12 @@
-// components/Auth/ProtectedRoute.js
-import React, { useContext } from 'react';
-import { Navigate } from 'react-router-dom';
-import { AuthContext } from '../../contexts/AuthContextc';
+// components/Auth/ProtectedRoute.jsx
+import { useContext } from 'react';
+import { useRouter } from 'next/navigation';
+import { AuthContext } from '../../contexts/AuthContext';
 
 const ProtectedRoute = ({ children }) => {
   const { currentUser, loading } = useContext(AuthContext);
-  
+  const router = useRouter();
+
   if (loading) {
     return (
       <div className="loading-container">
@@ -14,8 +15,13 @@ const ProtectedRoute = ({ children }) => {
       </div>
     );
   }
-  
-  return currentUser ? children : <Navigate to="/" />;
+
+  if (!currentUser) {
+    router.push('/');
+    return null;
+  }
+
+  return children;
 };
 
 export default ProtectedRoute;

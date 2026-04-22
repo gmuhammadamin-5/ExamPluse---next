@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useTests } from '../../contexts/TestContext'
 import { motion, AnimatePresence } from 'framer-motion'
-import * as THREE from 'three'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Float, Text3D, OrbitControls } from '@react-three/drei'
 
 // 3D Test Card komponenti
-function TestCard3D({ title, bandLevel, position, onClick }) {
+function TestCard3D({ title, position, onClick }) {
   const meshRef = React.useRef()
   
   useFrame((state) => {
@@ -102,7 +101,7 @@ const TestList = () => {
   }
 
   const handleStartTest = (test) => {
-    clickSound.play()
+    if (clickSound) clickSound.play()
     startTest(test)
   }
 

@@ -1,46 +1,31 @@
-"use client"; // Bu qator SHART (Chunki state va effect ishlatyapmiz)
+"use client";
 
 import React, { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import Header from '@/components/Layout/Header';
 import Footer from '@/components/Layout/Footer';
 import Loading from '@/components/Layout/Loading';
 
+const NO_SHELL = ['/admin'];
+
 export default function ClientShell({ children }) {
   const [loading, setLoading] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
-    // 2 soniyadan keyin loadingni o'chirish
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 2000);
-
-    // Mobile versiyani tekshirish
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', checkMobile);
-    };
+    const timer = setTimeout(() => setLoading(false), 500);
+    return () => clearTimeout(timer);
   }, []);
 
-  // Agar loading bo'lsa, faqat Loading komponenti chiqadi
-  if (loading) {
-    return <Loading />;
-  }
+  if (loading) return <Loading />;
 
-  // Yuklangandan keyin Sayt chiqadi
+  const isAdmin = NO_SHELL.some(p => pathname?.startsWith(p));
+  if (isAdmin) return <>{children}</>;
+
   return (
     <div className="App">
       <Header />
-      <main>
-        {children}
-      </main>
+      <main>{children}</main>
       <Footer />
     </div>
   );

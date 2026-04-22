@@ -1,3 +1,4 @@
+"use client";
 // TestContext.js
 import React, { createContext, useState, useContext, useEffect } from 'react'
 import { mockTestData, calculateBandScore } from './TestData'

@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -442,7 +443,7 @@ const GroupChat = () => {
     return (
       <div style={{
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+        background: 'linear-gradient(135deg, #f0f8ff 0%, #e6f7ff 50%, #d6f0ff 100%)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -1173,7 +1174,7 @@ const GroupChat = () => {
 const styles = {
   container: {
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+    background: 'linear-gradient(135deg, #f0f8ff 0%, #e6f7ff 50%, #d6f0ff 100%)',
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
     position: 'relative',
     overflow: 'hidden'

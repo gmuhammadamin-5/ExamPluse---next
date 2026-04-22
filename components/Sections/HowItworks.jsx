@@ -1,260 +1,177 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { gsap } from 'gsap';
-import { Play } from 'lucide-react';
+"use client";
+import { useRef, useState, useEffect } from 'react';
+import { Play, ArrowRight, CheckCircle } from 'lucide-react';
 
-const HowItWorks = () => {
-  const sectionRef = useRef(null);
-  const [isVisible, setIsVisible] = useState(false);
+const STEPS = [
+  { n:'01', title:'Create a Free Account', desc:'Sign up in 30 seconds. No credit card required.' },
+  { n:'02', title:'Choose Your Exam',      desc:'IELTS, Cambridge, TOEFL, CEFR or SAT — pick the mock test you need.' },
+  { n:'03', title:'Take a Mock Test',      desc:'Complete a full test or individual sections in a real exam environment.' },
+  { n:'04', title:'Get AI Feedback',       desc:'Receive your strengths, weaknesses, band score and personalised tips.' },
+];
 
-  // --- SCROLL ANIMATION ---
+export default function HowItWorks() {
+  const [visible, setVisible] = useState(false);
+  const ref = useRef(null);
+
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.2 }
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold: 0.15 }
     );
-
-    if (sectionRef.current) observer.observe(sectionRef.current);
-
-    return () => observer.disconnect();
+    if (ref.current) obs.observe(ref.current);
+    return () => obs.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (isVisible) {
-      const ctx = gsap.context(() => {
-        // Title animatsiyasi (Pastdan tepaga silliq chiqadi)
-        gsap.from(".anim-title", { 
-          y: 40, 
-          opacity: 0, 
-          duration: 1, 
-          ease: "power3.out" 
-        });
-        
-        // Video Player animatsiyasi (Tepadan pastga tushadi)
-        gsap.from(".anim-video", { 
-          y: -50, 
-          opacity: 0, 
-          scale: 0.95, 
-          duration: 1.2, 
-          delay: 0.2, 
-          ease: "power3.out" 
-        });
-      }, sectionRef);
-      return () => ctx.revert();
-    }
-  }, [isVisible]);
-
   return (
-    <section ref={sectionRef} style={styles.section}>
-      <div style={styles.container}>
-        
-        {/* SARLAVHA: "Our Services" uslubida (Havorang va Qalin) */}
-        <h2 className="anim-title" style={styles.mainTitle}>
-          How does this actually work?
-        </h2>
+    <section ref={ref} style={{
+      padding: '100px 20px',
+      background: '#fff',
+      fontFamily: "'Plus Jakarta Sans',system-ui,sans-serif",
+    }}>
+      <style>{`
+        @keyframes hiw-pulse {
+          0%,100% { transform:translate(-50%,-50%) scale(1);   opacity:.5; }
+          50%      { transform:translate(-50%,-50%) scale(1.18); opacity:.2; }
+        }
+        @keyframes hiw-float {
+          0%,100% { transform:translateY(0); }
+          50%      { transform:translateY(-8px); }
+        }
+        @media(max-width:900px){
+          .hiw-layout { grid-template-columns:1fr!important; }
+          .hiw-video  { max-width:520px!important; margin:0 auto!important; }
+        }
+      `}</style>
 
-        {/* --- VIDEO PLAYER --- */}
-        <div className="anim-video" style={styles.videoWrapper}>
-          
-          <div style={styles.screenContainer}>
-            {/* Header (Browser ko'rinishi) */}
-            <div style={styles.screenHeader}>
-              <div style={styles.dots}>
-                <div style={{...styles.dot, background: '#FF5F56'}}></div>
-                <div style={{...styles.dot, background: '#FFBD2E'}}></div>
-                <div style={{...styles.dot, background: '#27C93F'}}></div>
-              </div>
-              <div style={styles.urlBar}>exampulse.ai/tutorial</div>
-            </div>
+      <div style={{ maxWidth:1100, margin:'0 auto' }}>
 
-            {/* Video Area */}
-            <div style={styles.displayArea}>
-              <div style={styles.playBox}>
-                <div style={styles.pulseCircle}></div>
-                <div style={styles.playIcon}>
-                  <Play size={40} fill="#3b82f6" color="#3b82f6" style={{ marginLeft: '6px' }} />
-                </div>
-                <span style={styles.mediaLabel}>Watch System Walkthrough</span>
-              </div>
-              
-              {/* Gradient Fon (Video o'rnida) */}
-              <div style={styles.videoGradient}></div>
-            </div>
+        {/* header */}
+        <div style={{
+          textAlign:'center', marginBottom:64,
+          opacity: visible?1:0, transform: visible?'none':'translateY(20px)',
+          transition:'all .6s cubic-bezier(.4,0,.2,1)',
+        }}>
+          <div style={{ display:'inline-flex',alignItems:'center',gap:6,background:'#eff6ff',border:'1px solid rgba(0,123,255,0.2)',borderRadius:30,padding:'4px 14px',marginBottom:14 }}>
+            <CheckCircle size={11} color="#2563eb"/>
+            <span style={{ fontSize:11,fontWeight:800,color:'#007bff',letterSpacing:'1.5px' }}>HOW IT WORKS</span>
           </div>
-          
-          {/* Orqa fon Glow effekti */}
-          <div style={styles.glow}></div>
-
+          <h2 style={{ fontSize:36,fontWeight:900,color:'#0f172a',marginBottom:12,letterSpacing:'-0.5px' }}>
+            Reach your goal in 4 simple steps
+          </h2>
+          <p style={{ fontSize:15,color:'#64748b',maxWidth:480,margin:'0 auto',lineHeight:1.7 }}>
+            From sign-up to results — a simple and effective process.
+          </p>
         </div>
 
+        <div className="hiw-layout" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:56, alignItems:'center' }}>
+
+          {/* steps */}
+          <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
+            {STEPS.map((s, i) => (
+              <div key={s.n} style={{
+                display:'flex', alignItems:'flex-start', gap:18,
+                opacity: visible?1:0,
+                transform: visible?'none':'translateX(-20px)',
+                transition:`all .5s cubic-bezier(.4,0,.2,1) ${i*100+200}ms`,
+              }}>
+                {/* number + line */}
+                <div style={{ display:'flex',flexDirection:'column',alignItems:'center',flexShrink:0 }}>
+                  <div style={{
+                    width:44,height:44,borderRadius:13,
+                    background: i===0?'linear-gradient(135deg,#2563eb,#1d4ed8)':'#f8fafc',
+                    border: i===0?'none':'1.5px solid #f1f5f9',
+                    display:'flex',alignItems:'center',justifyContent:'center',
+                    fontSize:13,fontWeight:900,
+                    color: i===0?'#fff':'#94a3b8',
+                    boxShadow: i===0?'0 8px 20px rgba(0,123,255,0.25)':'none',
+                    transition:'all .3s',
+                  }}>{s.n}</div>
+                  {i < STEPS.length-1 && (
+                    <div style={{ width:2,height:28,background:'linear-gradient(180deg,#e2e8f0,transparent)',margin:'6px 0' }}/>
+                  )}
+                </div>
+                <div style={{ paddingTop:8 }}>
+                  <div style={{ fontSize:15,fontWeight:800,color:'#0f172a',marginBottom:4 }}>{s.title}</div>
+                  <div style={{ fontSize:13,color:'#64748b',lineHeight:1.65 }}>{s.desc}</div>
+                </div>
+              </div>
+            ))}
+
+            <div style={{
+              marginTop:8,
+              opacity: visible?1:0, transition:'all .5s .65s',
+            }}>
+              <a href="/tests" style={{
+                display:'inline-flex',alignItems:'center',gap:8,
+                padding:'13px 24px',
+                background:'linear-gradient(135deg,#2563eb,#1d4ed8)',
+                color:'#fff',border:'none',borderRadius:13,
+                fontSize:14,fontWeight:800,cursor:'pointer',
+                boxShadow:'0 8px 24px rgba(0,123,255,0.28)',
+                transition:'all .2s', textDecoration:'none',
+              }}>
+                Get Started <ArrowRight size={15}/>
+              </a>
+            </div>
+          </div>
+
+          {/* video mockup */}
+          <div className="hiw-video" style={{
+            position:'relative',
+            opacity: visible?1:0, transform: visible?'none':'translateX(20px)',
+            transition:'all .7s .15s cubic-bezier(.4,0,.2,1)',
+            animation: visible?'hiw-float 4s ease-in-out infinite':'none',
+          }}>
+            {/* glow */}
+            <div style={{ position:'absolute',top:'20%',left:'10%',width:'80%',height:'60%',background:'#007bff',filter:'blur(80px)',opacity:.15,zIndex:0,borderRadius:'50%' }}/>
+
+            {/* browser frame */}
+            <div style={{
+              position:'relative',zIndex:1,
+              background:'#fff',borderRadius:20,overflow:'hidden',
+              boxShadow:'0 32px 80px rgba(0,123,255,0.18), 0 4px 16px rgba(0,0,0,0.08)',
+              border:'1.5px solid #f1f5f9',
+            }}>
+              {/* browser bar */}
+              <div style={{ padding:'12px 18px',background:'#f8fafc',borderBottom:'1px solid #f1f5f9',display:'flex',alignItems:'center',gap:12 }}>
+                <div style={{ display:'flex',gap:6 }}>
+                  {['#ef4444','#f59e0b','#22c55e'].map(c=>(
+                    <div key={c} style={{ width:10,height:10,borderRadius:'50%',background:c }}/>
+                  ))}
+                </div>
+                <div style={{ flex:1,background:'#fff',borderRadius:8,padding:'5px 12px',fontSize:11,color:'#94a3b8',border:'1px solid #f1f5f9',textAlign:'center' }}>
+                  exampulse.uz/tests
+                </div>
+              </div>
+
+              {/* content area */}
+              <div style={{ background:'linear-gradient(135deg,#1e3a6e,#1d4ed8,#7c3aed)',aspectRatio:'16/9',display:'flex',alignItems:'center',justifyContent:'center',position:'relative',overflow:'hidden' }}>
+                {/* pulse ring */}
+                <div style={{ position:'absolute',top:'50%',left:'50%',width:130,height:130,borderRadius:'50%',border:'1.5px solid rgba(255,255,255,0.4)',animation:'hiw-pulse 2.5s ease-in-out infinite' }}/>
+                <div style={{ position:'absolute',top:'50%',left:'50%',width:170,height:170,borderRadius:'50%',border:'1px solid rgba(255,255,255,0.2)',animation:'hiw-pulse 2.5s ease-in-out .4s infinite' }}/>
+
+                {/* play button */}
+                <div style={{ position:'relative',zIndex:2,display:'flex',flexDirection:'column',alignItems:'center',gap:16 }}>
+                  <div style={{ width:72,height:72,borderRadius:'50%',background:'rgba(255,255,255,0.92)',backdropFilter:'blur(10px)',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 16px 40px rgba(0,0,0,0.2)',cursor:'pointer' }}>
+                    <Play size={28} fill="#2563eb" color="#2563eb" style={{ marginLeft:4 }}/>
+                  </div>
+                  <span style={{ color:'rgba(255,255,255,0.85)',fontSize:13,fontWeight:700,letterSpacing:'1px',textTransform:'uppercase' }}>
+                    See how it works
+                  </span>
+                </div>
+
+                {/* floating badges */}
+                <div style={{ position:'absolute',top:16,right:16,background:'rgba(255,255,255,0.15)',backdropFilter:'blur(8px)',borderRadius:10,padding:'6px 12px',fontSize:11,fontWeight:800,color:'#fff',border:'1px solid rgba(255,255,255,0.2)' }}>
+                  🎓 IELTS Mock
+                </div>
+                <div style={{ position:'absolute',bottom:16,left:16,background:'rgba(5,150,105,0.85)',backdropFilter:'blur(8px)',borderRadius:10,padding:'6px 12px',fontSize:11,fontWeight:800,color:'#fff' }}>
+                  ✅ Band 7.5 Achieved
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );
-};
-
-const styles = {
-  section: {
-    padding: '120px 0',
-    // 1. FON: HeroZenithPro bilan AYNAN BIR XIL (Chiziq bo'lmaydi)
-    background: 'linear-gradient(135deg, #f0f8ff 0%, #e6f7ff 50%, #d6f0ff 100%)',
-    fontFamily: "'Plus Jakarta Sans', sans-serif",
-    position: 'relative',
-    zIndex: 20,
-    overflow: 'hidden'
-  },
-  container: { 
-    maxWidth: '1200px', 
-    margin: '0 auto', 
-    padding: '0 20px', 
-    textAlign: 'center' 
-  },
-  
-  // 2. SARLAVHA STILI ("Our Services" bilan bir xil)
-  mainTitle: {
-    fontSize: '3rem',       // Katta
-    fontWeight: '900',      // Qalin
-    color: '#3b82f6',       // Brand Blue (Havorang)
-    marginBottom: '60px', 
-    letterSpacing: '-1px',
-    textTransform: 'none',   // Hammasi kichkina bo'lmasligi uchun
-    lineHeight: '1.2'
-  },
-
-  // Video Wrapper (Akkuratniy o'lcham)
-  videoWrapper: {
-    position: 'relative',
-    maxWidth: '850px', 
-    margin: '0 auto',
-    zIndex: 10
-  },
-
-  screenContainer: {
-    width: '100%', 
-    aspectRatio: '16/9', 
-    background: '#FFFFFF', 
-    borderRadius: '24px', 
-    overflow: 'hidden', 
-    // Chiroyli yumshoq soya
-    boxShadow: '0 40px 80px -20px rgba(59, 130, 246, 0.25)', 
-    zIndex: 2, 
-    position: 'relative',
-    border: '6px solid white'
-  },
-  screenHeader: {
-    padding: '14px 24px', 
-    background: '#f8fafc', 
-    borderBottom: '1px solid #e2e8f0',
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '15px'
-  },
-  dots: { display: 'flex', gap: '8px' },
-  dot: { width: '10px', height: '10px', borderRadius: '50%' },
-  urlBar: { 
-    flex: 1, 
-    background: '#ffffff', 
-    padding: '6px 15px', 
-    borderRadius: '8px', 
-    fontSize: '12px', 
-    color: '#94a3b8', 
-    border: '1px solid #e2e8f0', 
-    textAlign: 'center', 
-    fontWeight: '500'
-  },
-  
-  displayArea: { 
-    width: '100%', 
-    height: '100%', 
-    position: 'relative', 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center',
-    overflow: 'hidden'
-  },
-  
-  videoGradient: { 
-    width: '100%', 
-    height: '100%', 
-    position: 'absolute', 
-    top: 0, 
-    left: 0,
-    // Yorqin Moviy Gradient
-    background: 'linear-gradient(45deg, #60a5fa, #3b82f6, #2563eb)',
-    opacity: 0.85
-  },
-  
-  playBox: { 
-    position: 'relative', 
-    zIndex: 10, 
-    display: 'flex', 
-    flexDirection: 'column', 
-    alignItems: 'center', 
-    gap: '25px'
-  },
-  
-  playIcon: { 
-    width: '90px', 
-    height: '90px', 
-    background: 'rgba(255,255,255,0.9)', 
-    backdropFilter: 'blur(10px)', 
-    borderRadius: '50%', 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    cursor: 'pointer', 
-    transition: 'transform 0.3s ease',
-    boxShadow: '0 20px 40px rgba(0,0,0,0.1)'
-  },
-  
-  pulseCircle: {
-    position: 'absolute', 
-    top: '50%', 
-    left: '50%', 
-    transform: 'translate(-50%, -50%)',
-    width: '140px', 
-    height: '140px', 
-    borderRadius: '50%',
-    border: '1px solid rgba(255,255,255,0.6)', 
-    opacity: 0.6,
-    animation: 'pulse 2s infinite' 
-  },
-  
-  mediaLabel: { 
-    color: 'white', 
-    fontSize: '15px', 
-    fontWeight: '700', 
-    letterSpacing: '1px', 
-    textTransform: 'uppercase',
-    textShadow: '0 2px 5px rgba(0,0,0,0.2)'
-  },
-  
-  glow: {
-    position: 'absolute', 
-    top: '15%', 
-    left: '10%', 
-    width: '80%', 
-    height: '80%',
-    background: '#3b82f6', 
-    filter: 'blur(100px)', 
-    opacity: 0.4, 
-    zIndex: 1,
-    transform: 'translateY(40px)'
-  }
-};
-
-// CSS Animation (Pulse uchun)
-const styleSheet = document.createElement("style");
-styleSheet.innerText = `
-  @keyframes pulse {
-    0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.8; }
-    50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.4; }
-    100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.8; }
-  }
-`;
-document.head.appendChild(styleSheet);
-
-export default HowItWorks;
+}

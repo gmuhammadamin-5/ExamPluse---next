@@ -1,3 +1,3 @@
 "use client";
-import TestsSection from '@/components/Sections/TestsSection';
-export default function TestsPage() { return <TestsSection />; }
+import ExamHub from '@/components/Tests/ExamHub';
+export default function TestsPage() { return <ExamHub />; }

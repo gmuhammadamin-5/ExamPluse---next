@@ -1,288 +1,393 @@
+"use client";
+
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Points, PointMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquareText, Headphones, BookOpen, PenTool, Sparkles, ArrowRight, PlayCircle, MonitorPlay, ChevronRight } from 'lucide-react';
+import {
+  MessageSquareText, Headphones, BookOpen, PenTool,
+  Sparkles, ArrowRight, PlayCircle, MonitorPlay, ChevronRight,
+} from 'lucide-react';
 
-// --- RANGLAR (SIZGA YOQQAN TO'Q MOVIY) ---
-const PARTICLES_COLOR = '#1e3a8a'; 
-const BRAND_BLUE = '#3b82f6';      
-const BG_GRADIENT = 'linear-gradient(135deg, #f0f8ff 0%, #e6f7ff 50%, #d6f0ff 100%)';
-
-// --- SHAKLNI NUSXALASH ---
-function sampleShapeFromCanvas(count, drawFn) {
-  const canvas = document.createElement('canvas');
-  const size = 400; canvas.width = size; canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, size, size); 
-  ctx.fillStyle = '#fff'; drawFn(ctx, size); 
-
-  const imgData = ctx.getImageData(0, 0, size, size);
-  const pixels = imgData.data;
-  const positions = new Float32Array(count * 3);
-  let collected = 0; let attempt = 0;
-  
-  // Yopishib qolmasligi uchun (Scale 5.0)
-  while (collected < count && attempt < count * 50) {
-      const x = Math.floor(Math.random() * size);
-      const y = Math.floor(Math.random() * size);
-      const index = (y * size + x) * 4;
-      if (pixels[index] > 50) { 
-          const i3 = collected * 3;
-          positions[i3] = (x / size - 0.5) * 5.0; 
-          positions[i3+1] = -(y / size - 0.5) * 5.0; 
-          positions[i3+2] = (Math.random() - 0.5) * 0.5; 
-          collected++;
-      }
-      attempt++;
-  }
-  return positions;
+const SVC_COLOR = {
+  Speaking:  '#0ea5e9',
+  Listening: '#050a09',
+  Reading:   '#7c3aed',
+  Writing:   '#ea580c',
 }
 
-// --- 3D ENGINE ---
-function MorphingParticles({ section, activeService }) {
-  const ref = useRef();
-  const count = 13000; 
+const STATS = [
+  { value: '12,000+', label: 'Students',  color: '#3b82f6' },
+  { value: '98.7%',   label: 'Accuracy',  color: '#0ea5e9' },
+  { value: '4.9 ★',  label: 'Rating',    color: '#7c3aed' },
+  { value: '150+',    label: 'Countries', color: '#059669' },
+]
+
+function sampleShape(count, drawFn) {
+  if (typeof window === 'undefined') return new Float32Array(count * 3)
+  const cv = document.createElement('canvas')
+  cv.width = cv.height = 400
+  const ctx = cv.getContext('2d')
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, 400, 400)
+  ctx.fillStyle = '#fff'; drawFn(ctx, 400)
+  const px = ctx.getImageData(0, 0, 400, 400).data
+  const pos = new Float32Array(count * 3)
+  let n = 0, a = 0
+  while (n < count && a < count * 50) {
+    const x = Math.floor(Math.random() * 400)
+    const y = Math.floor(Math.random() * 400)
+    if (px[(y * 400 + x) * 4] > 50) {
+      pos[n*3]   = (x / 400 - 0.5) * 5.0
+      pos[n*3+1] = -(y / 400 - 0.5) * 5.0
+      pos[n*3+2] = (Math.random() - 0.5) * 0.5
+      n++
+    }
+    a++
+  }
+  return pos
+}
+
+function MorphingParticles({ section, activeService, mouseRef }) {
+  const { scene } = useThree()
+  const count = 13000
 
   const shapes = useMemo(() => {
-    const sphere = new Float32Array(count * 3);
+    const sphere = new Float32Array(count * 3)
     for (let i = 0; i < count; i++) {
-      const i3 = i * 3; 
-      const phi = Math.acos(-1 + (2 * i) / count); 
-      const theta = Math.sqrt(count * Math.PI) * phi; 
-      const r = 2.5; 
-      sphere.set([r * Math.cos(theta) * Math.sin(phi), r * Math.sin(theta) * Math.sin(phi), r * Math.cos(phi)], i3);
+      const phi = Math.acos(-1 + (2 * i) / count)
+      const theta = Math.sqrt(count * Math.PI) * phi
+      const r = 2.5, i3 = i * 3
+      sphere[i3]   = r * Math.cos(theta) * Math.sin(phi)
+      sphere[i3+1] = r * Math.sin(theta) * Math.sin(phi)
+      sphere[i3+2] = r * Math.cos(phi)
     }
-    const speaking = sampleShapeFromCanvas(count, (ctx, s) => {
-        ctx.beginPath(); ctx.arc(s*0.3, s*0.6, s*0.15, 0, Math.PI*2); ctx.fill();
-        ctx.beginPath(); ctx.ellipse(s*0.3, s*0.9, s*0.22, s*0.14, 0, Math.PI, Math.PI*2); ctx.fill();
-        ctx.roundRect(s*0.5, s*0.25, s*0.4, s*0.3, s*0.05); ctx.fill();
-        ctx.beginPath(); ctx.moveTo(s*0.6, s*0.55); ctx.lineTo(s*0.5, s*0.65); ctx.lineTo(s*0.7, s*0.55); ctx.fill();
-    });
-    const listening = sampleShapeFromCanvas(count, (ctx, s) => {
-        ctx.lineWidth = s*0.1; ctx.strokeStyle = '#fff';
-        ctx.beginPath(); ctx.arc(s*0.5, s*0.5, s*0.35, Math.PI, 0); ctx.stroke();
-        ctx.fillStyle = '#fff'; ctx.fillRect(s*0.06, s*0.45, s*0.14, s*0.25); ctx.fillRect(s*0.8, s*0.45, s*0.14, s*0.25);
-    });
-    const reading = sampleShapeFromCanvas(count, (ctx, s) => {
-        ctx.beginPath();
-        ctx.moveTo(s*0.5, s*0.2); ctx.quadraticCurveTo(s*0.25, s*0.25, s*0.1, s*0.2); ctx.lineTo(s*0.1, s*0.8); ctx.quadraticCurveTo(s*0.25, s*0.85, s*0.5, s*0.8);
-        ctx.moveTo(s*0.5, s*0.2); ctx.quadraticCurveTo(s*0.75, s*0.25, s*0.9, s*0.2); ctx.lineTo(s*0.9, s*0.8); ctx.quadraticCurveTo(s*0.75, s*0.85, s*0.5, s*0.8);
-        ctx.lineTo(s*0.5, s*0.2); ctx.fill();
-    });
-    const writing = sampleShapeFromCanvas(count, (ctx, s) => {
-        ctx.save(); ctx.translate(s*0.5, s*0.5); ctx.rotate(-Math.PI/4);
-        ctx.fillRect(-s*0.08, -s*0.35, s*0.16, s*0.7); 
-        ctx.beginPath(); ctx.moveTo(-s*0.08, s*0.35); ctx.lineTo(0, s*0.5); ctx.lineTo(s*0.08, s*0.35); ctx.fill(); ctx.restore();
-    });
-    return { sphere, speaking, listening, reading, writing };
-  }, []);
+    const speaking = sampleShape(count, (c, s) => {
+      c.beginPath(); c.arc(s*.5, s*.26, s*.13, 0, Math.PI*2); c.fill()
+      c.beginPath(); c.ellipse(s*.5, s*.56, s*.17, s*.2, 0, 0, Math.PI*2); c.fill()
+      c.beginPath(); c.roundRect(s*.58, s*.13, s*.33, s*.22, s*.04); c.fill()
+      c.beginPath(); c.moveTo(s*.62, s*.35); c.lineTo(s*.56, s*.43); c.lineTo(s*.72, s*.35); c.fill()
+    })
+    const listening = sampleShape(count, (c, s) => {
+      c.beginPath()
+      c.arc(s*.38, s*.5, s*.19, Math.PI*.6, Math.PI*1.4, true)
+      c.arc(s*.38, s*.5, s*.09, Math.PI*1.4, Math.PI*.6, false)
+      c.fill()
+      c.lineWidth = s*.024; c.strokeStyle = '#fff'
+      c.beginPath(); c.arc(s*.38, s*.5, s*.30, -Math.PI*.35, Math.PI*.35); c.stroke()
+      c.beginPath(); c.arc(s*.38, s*.5, s*.42, -Math.PI*.35, Math.PI*.35); c.stroke()
+      c.beginPath(); c.arc(s*.38, s*.5, s*.54, -Math.PI*.35, Math.PI*.35); c.stroke()
+    })
+    const reading = sampleShape(count, (c, s) => {
+      c.beginPath()
+      c.moveTo(s*.5, s*.18); c.quadraticCurveTo(s*.35, s*.2, s*.1, s*.15)
+      c.lineTo(s*.1, s*.82); c.quadraticCurveTo(s*.35, s*.86, s*.5, s*.82)
+      c.closePath(); c.fill()
+      c.beginPath()
+      c.moveTo(s*.5, s*.18); c.quadraticCurveTo(s*.65, s*.2, s*.9, s*.15)
+      c.lineTo(s*.9, s*.82); c.quadraticCurveTo(s*.65, s*.86, s*.5, s*.82)
+      c.closePath(); c.fill()
+    })
+    const writing = sampleShape(count, (c, s) => {
+      c.beginPath(); c.roundRect(s*.12, s*.08, s*.52, s*.76, s*.03); c.fill()
+      c.fillStyle = '#000'
+      for (let i = 0; i < 6; i++) c.fillRect(s*.2, s*.2 + i * s*.09, s*.36, s*.018)
+      c.fillStyle = '#fff'
+      c.fillRect(s*.72, s*.1, s*.1, s*.6)
+      c.beginPath(); c.moveTo(s*.72, s*.7); c.lineTo(s*.77, s*.84); c.lineTo(s*.82, s*.7); c.fill()
+      c.fillStyle = '#000'; c.fillRect(s*.72, s*.1, s*.1, s*.07)
+    })
+    return { sphere, speaking, listening, reading, writing }
+  }, [])
 
-  const velocities = useMemo(() => new Float32Array(count * 3), []);
+  const mat = useRef(new THREE.PointsMaterial({
+    color: new THREE.Color('#1e3a8a'),
+    size: 0.052, sizeAttenuation: true,
+    transparent: true, opacity: 0.92, depthWrite: false,
+  }))
 
-  useFrame((state) => {
-    const time = state.clock.getElapsedTime(); 
-    const array = ref.current.geometry.attributes.position.array;
+  const geo = useRef((() => {
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.BufferAttribute(shapes.sphere.slice(), 3))
+    return g
+  })())
 
-    // Positsiya: Hero(0) -> Services(-3.5)
-    let targetPos = new THREE.Vector3(section === 'hero' ? 0 : -3.5, 0, 0);
-    ref.current.position.lerp(targetPos, 0.05);
-
-    let targetShape = shapes.sphere;
-    if (section === 'services') {
-      if (activeService === 'Speaking') targetShape = shapes.speaking;
-      else if (activeService === 'Listening') targetShape = shapes.listening;
-      else if (activeService === 'Reading') targetShape = shapes.reading;
-      else if (activeService === 'Writing') targetShape = shapes.writing;
-    }
-
-    // Tinch animatsiya (Sichqonchadan qochmaydi)
-    for (let i = 0; i < count; i++) {
-      const i3 = i * 3;
-      const idle = Math.sin(time * 0.5 + i * 0.1) * 0.015; 
-      
-      array[i3]   += (targetShape[i3]   + idle - array[i3])   * 0.07;
-      array[i3+1] += (targetShape[i3+1] + idle - array[i3+1]) * 0.07;
-      array[i3+2] += (targetShape[i3+2]        - array[i3+2]) * 0.07;
-    }
-    ref.current.geometry.attributes.position.needsUpdate = true;
-
-    if (section === 'hero') { ref.current.rotation.y += 0.0015; } 
-    else { ref.current.rotation.y = THREE.MathUtils.lerp(ref.current.rotation.y, 0, 0.05); }
-  });
-
-  return (
-    <Points ref={ref} positions={shapes.sphere.slice()} stride={3} frustumCulled={false}>
-      <PointMaterial transparent color={PARTICLES_COLOR} size={0.055} sizeAttenuation={true} depthWrite={false} opacity={1.0} />
-    </Points>
-  );
-}
-
-// --- ASOSIY KOMPONENT ---
-const HeroZenithPro = () => {
-  const [section, setSection] = useState('hero');
-  const [activeService, setActiveService] = useState('Speaking');
+  const mesh = useRef(new THREE.Points(geo.current, mat.current))
 
   useEffect(() => {
-    const handleScroll = () => {
-      // Hero balandligidan o'tganda
-      setSection(window.scrollY > window.innerHeight * 0.5 ? 'services' : 'hero');
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+    scene.add(mesh.current)
+    return () => scene.remove(mesh.current)
+  }, [scene])
+
+  const lifeOffsets = useMemo(() => {
+    const a = new Float32Array(count)
+    for (let i = 0; i < count; i++) a[i] = Math.random() * Math.PI * 2
+    return a
+  }, [])
+
+  const tgtColor = useRef(new THREE.Color('#1e3a8a'))
+  const secRef = useRef(section)
+  const svcRef = useRef(activeService)
+
+  useEffect(() => { secRef.current = section }, [section])
+  useEffect(() => {
+    svcRef.current = activeService
+    tgtColor.current.set(SVC_COLOR[activeService] || '#1e3a8a')
+  }, [activeService])
+  useEffect(() => {
+    if (section === 'hero') tgtColor.current.set('#1e3a8a')
+    else tgtColor.current.set(SVC_COLOR[activeService] || '#1e3a8a')
+  }, [section])
+
+  useFrame((state) => {
+    const m = mesh.current
+    const ma = mat.current
+    const g = geo.current
+    if (!m) return
+    const t = state.clock.getElapsedTime()
+    const sec = secRef.current
+    const svc = svcRef.current
+    const arr = g.attributes.position.array
+
+    let target = shapes.sphere
+    if (sec === 'services') {
+      if (svc === 'Speaking') target = shapes.speaking
+      else if (svc === 'Listening') target = shapes.listening
+      else if (svc === 'Reading') target = shapes.reading
+      else if (svc === 'Writing') target = shapes.writing
+    }
+
+    const tx = sec === 'hero' ? 0 : -3.2
+    m.position.x = THREE.MathUtils.lerp(m.position.x, tx, 0.045)
+
+    const mx = mouseRef?.current?.x ?? 0
+    const my = mouseRef?.current?.y ?? 0
+    if (sec === 'hero') {
+      m.rotation.y = THREE.MathUtils.lerp(m.rotation.y, mx * 0.5 + t * 0.001, 0.04)
+      m.rotation.x = THREE.MathUtils.lerp(m.rotation.x, -my * 0.3 + Math.sin(t * 0.15) * 0.08, 0.04)
+    } else {
+      m.rotation.y += 0.0008
+      m.rotation.x = THREE.MathUtils.lerp(m.rotation.x, -my * 0.12, 0.03)
+    }
+
+    for (let i = 0; i < count; i++) {
+      const i3 = i * 3, off = lifeOffsets[i]
+      const lv = Math.sin(t*.4+off)*.025 + Math.sin(t*1.2+off*1.7)*.012 + Math.sin(t*3.5+off*2.3)*.006
+      arr[i3]   += (target[i3]   + lv - arr[i3])   * 0.065
+      arr[i3+1] += (target[i3+1] + lv*.8 - arr[i3+1]) * 0.065
+      arr[i3+2] += (target[i3+2] + Math.sin(t*.8+off)*.04 - arr[i3+2]) * 0.065
+    }
+    g.attributes.position.needsUpdate = true
+    ma.color.lerp(tgtColor.current, 0.05)
+  })
+
+  return null
+}
+
+export default function Hero() {
+  const [section, setSection] = useState('hero')
+  const [activeService, setActiveService] = useState('Speaking')
+  const [scrollProg, setScrollProg] = useState(0)
+  const [mounted, setMounted] = useState(false)
+  const mouseRef = useRef({ x: 0, y: 0 })
+
+  useEffect(() => { setTimeout(() => setMounted(true), 80) }, [])
+
+  useEffect(() => {
+    const fn = () => {
+      const max = document.body.scrollHeight - window.innerHeight
+      setScrollProg(max > 0 ? window.scrollY / max : 0)
+      setSection(window.scrollY > window.innerHeight * 0.6 ? 'services' : 'hero')
+    }
+    window.addEventListener('scroll', fn, { passive: true })
+    return () => window.removeEventListener('scroll', fn)
+  }, [])
+
+  useEffect(() => {
+    const fn = (e) => {
+      mouseRef.current = {
+        x: (e.clientX / window.innerWidth - 0.5) * 2,
+        y: (e.clientY / window.innerHeight - 0.5) * 2,
+      }
+    }
+    window.addEventListener('mousemove', fn, { passive: true })
+    return () => window.removeEventListener('mousemove', fn)
+  }, [])
 
   const services = [
-    { id: 'Speaking', icon: <MessageSquareText size={22}/>, title: "Speaking AI", desc: "Fluency & pronunciation analysis.", screen: "Speaking Simulation" },
-    { id: 'Listening', icon: <Headphones size={22}/>, title: "Listening Lab", desc: "High-fidelity audio tests.", screen: "Listening Interface" },
-    { id: 'Reading', icon: <BookOpen size={22}/>, title: "Reading Engine", desc: "Smart text highlighting.", screen: "Reading View" },
-    { id: 'Writing', icon: <PenTool size={22}/>, title: "Writing Pro", desc: "Instant grammar feedback.", screen: "Writing Editor" },
-  ];
+    { id: 'Speaking',  icon: <MessageSquareText size={21}/>, title: 'Speaking AI',    desc: 'Fluency & pronunciation analysis.',  screen: 'Speaking Simulation'  },
+    { id: 'Listening', icon: <Headphones size={21}/>,        title: 'Listening Lab',  desc: 'High-fidelity audio tests.',         screen: 'Listening Interface'  },
+    { id: 'Reading',   icon: <BookOpen size={21}/>,          title: 'Reading Engine', desc: 'Smart text highlighting.',           screen: 'Reading View'         },
+    { id: 'Writing',   icon: <PenTool size={21}/>,           title: 'Writing Pro',    desc: 'Instant grammar feedback.',          screen: 'Writing Editor'       },
+  ]
 
-  const currentScreenText = services.find(s => s.id === activeService)?.screen;
+  const currentScreen = services.find(s => s.id === activeService)?.screen
 
   return (
-    <div style={{ background: BG_GRADIENT, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-      
-      {/* BU YERDA KAT KOD: PARENT DIV (Relative)
-          Bu div Hero va Servicesni ushlab turadi.
-      */}
-      <div style={{ position: 'relative' }}>
-        
-        {/* CANVAS (STICKY) - Faqat shu parent ichida qotib turadi */}
-        <div style={{ 
-            position: 'sticky', 
-            top: 0, 
-            height: '100vh', 
-            width: '100%', 
-            zIndex: 0,
-            overflow: 'hidden'
-        }}>
-          <Canvas camera={{ position: [0, 0, 8.5], fov: 50 }} dpr={[1, 2]}>
-            <MorphingParticles section={section} activeService={activeService} />
+    <>
+      <style>{`
+        @media (max-width: 768px) {
+          .ep-left { display: none !important; }
+          .ep-grid { grid-template-columns: 1fr !important; padding: 0 16px !important; }
+          .ep-h1   { font-size: 2.2rem !important; letter-spacing: -2px !important; }
+          .ep-btns { flex-direction: column !important; }
+          .ep-btn  { justify-content: center !important; }
+        }
+      `}</style>
+
+      {/* Scroll progress */}
+      <div style={{ position:'fixed', left:22, top:'50%', transform:'translateY(-50%)', zIndex:100, display:'flex', flexDirection:'column', alignItems:'center', gap:8, pointerEvents:'none' }}>
+        <div style={{ width:2, height:110, background:'rgba(59,130,246,0.15)', borderRadius:2, position:'relative', overflow:'hidden' }}>
+          <div style={{ position:'absolute', top:0, left:0, right:0, height:`${scrollProg*100}%`, background:'linear-gradient(180deg,#0ea5e9,#3b82f6)', borderRadius:2, transition:'height .08s linear' }}/>
+        </div>
+        {[0,1].map(i => (
+          <div key={i} style={{ width:6, height:6, borderRadius:'50%', background: scrollProg >= i*0.45 ? '#3b82f6' : 'rgba(59,130,246,0.2)', transition:'background .3s' }}/>
+        ))}
+      </div>
+
+      <div style={{ position:'relative' }}>
+        {/* Sticky canvas */}
+        <div style={{ position:'sticky', top:0, height:'100vh', width:'100%', zIndex:0, overflow:'hidden' }}>
+          <Canvas camera={{ position:[0,0,8.5], fov:50 }} dpr={[1,1.5]} gl={{ alpha:true }} style={{ background:'transparent' }}>
+            <MorphingParticles section={section} activeService={activeService} mouseRef={mouseRef}/>
           </Canvas>
         </div>
 
-        {/* CONTENT (Hero + Services) 
-            Sticky canvas ustiga chiqishi uchun margin-top: -100vh 
-        */}
-        <div style={{ position: 'relative', zIndex: 10, marginTop: '-100vh' }}>
-          
-          {/* Hero Section */}
-          <section style={{ 
-            height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            opacity: section === 'hero' ? 1 : 0, 
-            transform: section === 'hero' ? 'translateY(0)' : 'translateY(-50px)',
-            transition: 'all 0.6s ease',
-            pointerEvents: section === 'hero' ? 'auto' : 'none'
+        <div style={{ position:'relative', zIndex:10, marginTop:'-100vh' }}>
+
+          {/* HERO SECTION */}
+          <section style={{
+            height:'100vh', display:'flex', alignItems:'center', justifyContent:'center',
+            opacity: section==='hero' ? 1 : 0,
+            transform: section==='hero' ? 'translateY(0)' : 'translateY(-40px)',
+            transition: 'opacity 0.5s, transform 0.5s',
+            pointerEvents: section==='hero' ? 'auto' : 'none',
+            padding:'0 20px',
           }}>
-            <div style={{ textAlign: 'center', maxWidth: '800px' }}>
-              <div style={S.badge}><Sparkles size={14} fill={BRAND_BLUE} /> ExamPulse v2.0</div>
-              <h1 style={S.h1}>Mastery <br/><span style={{color: BRAND_BLUE}}>Perfected by AI.</span></h1>
-              <p style={S.desc}>Fusing neural engineering with official standards. Experience the future.</p>
-              <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
-                <button style={S.btnPrimary}>Start Assessment <ArrowRight size={18} /></button>
-                <button style={S.btnSecondary}><PlayCircle size={20} color={BRAND_BLUE} /> Watch Demo</button>
+            <div style={{ textAlign:'center', maxWidth:820, width:'100%' }}>
+
+              <motion.div initial={{ opacity:0, y:-20 }} animate={mounted?{opacity:1,y:0}:{}} transition={{ duration:.5 }}
+                style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(255,255,255,0.88)', backdropFilter:'blur(14px)', padding:'9px 20px', borderRadius:100, fontSize:12, fontWeight:800, color:'#3b82f6', marginBottom:24, border:'1px solid rgba(59,130,246,0.16)' }}>
+                <Sparkles size={13} fill="#3b82f6"/> ExamPulse v2.0
+              </motion.div>
+
+              <motion.h1 className="ep-h1" initial={{ opacity:0, y:28 }} animate={mounted?{opacity:1,y:0}:{}} transition={{ duration:.65, delay:.1 }}
+                style={{ fontSize:'clamp(2.4rem,6vw,5.5rem)', fontWeight:900, color:'#0f172a', lineHeight:.95, letterSpacing:'-3px', margin:'0 0 22px' }}>
+                Mastery<br/><span style={{ color:'#3b82f6' }}>Perfected by AI.</span>
+              </motion.h1>
+
+              <motion.p initial={{ opacity:0, y:20 }} animate={mounted?{opacity:1,y:0}:{}} transition={{ duration:.6, delay:.2 }}
+                style={{ fontSize:'1.05rem', color:'#475569', lineHeight:1.7, fontWeight:500, maxWidth:500, margin:'0 auto 32px' }}>
+                Fusing neural engineering with official IELTS standards. Experience the future of exam preparation.
+              </motion.p>
+
+              <motion.div className="ep-btns" initial={{ opacity:0, y:16 }} animate={mounted?{opacity:1,y:0}:{}} transition={{ duration:.55, delay:.3 }}
+                style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
+                <button className="ep-btn" onClick={() => {}}
+                  style={{ background:'linear-gradient(135deg,#3b82f6,#1d4ed8)', color:'#fff', border:'none', padding:'14px 28px', borderRadius:13, fontSize:14, fontWeight:800, cursor:'pointer', display:'flex', alignItems:'center', gap:8, boxShadow:'0 8px 26px rgba(59,130,246,0.4)', transition:'all .22s', fontFamily:'inherit' }}
+                  onMouseOver={e=>e.currentTarget.style.transform='translateY(-2px)'} onMouseOut={e=>e.currentTarget.style.transform='translateY(0)'}>
+                  Start Assessment <ArrowRight size={16}/>
+                </button>
+                <button className="ep-btn" onClick={() => {}}
+                  style={{ background:'rgba(255,255,255,0.82)', backdropFilter:'blur(14px)', color:'#1e293b', border:'1.5px solid rgba(255,255,255,0.95)', padding:'14px 28px', borderRadius:13, fontSize:14, fontWeight:800, cursor:'pointer', display:'flex', alignItems:'center', gap:8, boxShadow:'0 4px 18px rgba(0,0,0,0.07)', transition:'all .22s', fontFamily:'inherit' }}
+                  onMouseOver={e=>e.currentTarget.style.transform='translateY(-2px)'} onMouseOut={e=>e.currentTarget.style.transform='translateY(0)'}>
+                  <PlayCircle size={17} color="#3b82f6"/> Watch Demo
+                </button>
+              </motion.div>
+
+              <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap', marginTop:36, opacity:mounted?1:0, transform:mounted?'translateY(0)':'translateY(20px)', transition:'all 0.7s ease 0.5s' }}>
+                {STATS.map((s,i) => (
+                  <motion.div key={s.label} initial={{ opacity:0, y:20, scale:.9 }} animate={mounted?{opacity:1,y:0,scale:1}:{}} transition={{ delay:.55+i*.07, duration:.45 }}
+                    style={{ background:'rgba(255,255,255,0.78)', backdropFilter:'blur(18px)', border:'1px solid rgba(255,255,255,0.96)', borderRadius:14, padding:'12px 20px', textAlign:'center', boxShadow:'0 4px 22px rgba(0,0,0,0.06)', minWidth:95 }}>
+                    <div style={{ fontSize:20, fontWeight:900, color:s.color, lineHeight:1 }}>{s.value}</div>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#94a3b8', marginTop:4, textTransform:'uppercase', letterSpacing:'0.8px' }}>{s.label}</div>
+                  </motion.div>
+                ))}
               </div>
-              <div style={{ marginTop: '50px', color: '#94a3b8', fontSize: '14px' }}>↓ Scroll to Explore</div>
+
+              <motion.div initial={{ opacity:0 }} animate={mounted?{opacity:1}:{}} transition={{ delay:1.1 }}
+                style={{ marginTop:28, color:'#94a3b8', fontSize:13, fontWeight:600 }}>
+                ↓ Scroll to Explore
+              </motion.div>
             </div>
           </section>
 
-          {/* Services Section */}
-          <section style={{ 
-            minHeight: '100vh', display: 'flex', alignItems: 'center', 
-            opacity: section === 'services' ? 1 : 0,
-            pointerEvents: section === 'services' ? 'auto' : 'none',
-            transition: 'opacity 0.6s ease'
+          {/* SERVICES SECTION */}
+          <section style={{
+            minHeight:'100vh', display:'flex', alignItems:'center',
+            opacity: section==='services' ? 1 : 0,
+            transition: 'opacity 0.55s',
+            pointerEvents: section==='services' ? 'auto' : 'none',
           }}>
-            <div style={{ maxWidth: '1400px', margin: '0 auto', width: '100%', padding: '0 50px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px' }}>
-              
-              <div></div> {/* Chap taraf bo'sh (Tochkalar shu yerda bo'ladi) */}
+            <div className="ep-grid" style={{ maxWidth:1400, margin:'0 auto', width:'100%', display:'grid', gridTemplateColumns:'1fr 1fr', gap:40, padding:'0 50px' }}>
+              <div className="ep-left"/>
 
-              <div style={{display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
-                <h2 style={{...S.h2, color: BRAND_BLUE}}>Our Services</h2>
-                <p style={{ color: '#64748b', marginBottom: '30px', fontSize: '18px' }}>Choose a module to experience the simulation.</p>
+              <div style={{ display:'flex', flexDirection:'column', justifyContent:'center', padding:'60px 0' }}>
+                <motion.div initial={{ opacity:0, x:30 }} animate={section==='services'?{opacity:1,x:0}:{}} transition={{ duration:.55 }}>
+                  <div style={{ fontSize:11, fontWeight:800, color:'#3b82f6', textTransform:'uppercase', letterSpacing:2, marginBottom:10 }}>What We Offer</div>
+                  <h2 style={{ fontSize:'clamp(1.7rem,4vw,2.8rem)', fontWeight:900, color:'#0f172a', marginBottom:10, lineHeight:1.1, letterSpacing:'-1.5px' }}>
+                    Our <span style={{ color:'#3b82f6' }}>Services</span>
+                  </h2>
+                  <p style={{ color:'#64748b', marginBottom:22, fontSize:14, lineHeight:1.65 }}>
+                    Click a module — watch the particles transform.
+                  </p>
+                </motion.div>
 
-                <div style={{ display: 'grid', gap: '14px', marginBottom: '40px' }}>
-                  {services.map((srv) => (
-                    <div 
-                      key={srv.id}
-                      onClick={() => setActiveService(srv.id)}
-                      style={{
-                        padding: '18px 24px', borderRadius: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '20px', 
-                        transition: 'all 0.3s ease',
-                        background: activeService === srv.id ? '#ffffff' : 'rgba(255,255,255,0.5)',
-                        border: activeService === srv.id ? `2px solid ${BRAND_BLUE}` : '2px solid transparent',
-                        boxShadow: activeService === srv.id ? '0 12px 30px rgba(59, 130, 246, 0.15)' : 'none',
-                        transform: activeService === srv.id ? 'translateX(5px)' : 'translateX(0)'
-                      }}
-                    >
-                      <div style={{ 
-                        background: activeService === srv.id ? BRAND_BLUE : '#e2e8f0', 
-                        color: activeService === srv.id ? '#fff' : '#64748b',
-                        width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                      }}>
-                        {srv.icon}
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#0f172a' }}>{srv.title}</h3>
-                        <p style={{ margin: '3px 0 0 0', fontSize: '13px', color: '#64748b' }}>{srv.desc}</p>
-                      </div>
-                      {activeService === srv.id && <ChevronRight size={20} color={BRAND_BLUE} />}
+                <div style={{ display:'grid', gap:9, marginBottom:22 }}>
+                  {services.map((srv, i) => {
+                    const active = activeService === srv.id
+                    const col = SVC_COLOR[srv.id]
+                    return (
+                      <motion.div key={srv.id}
+                        initial={{ opacity:0, x:30 }} animate={section==='services'?{opacity:1,x:0}:{}} transition={{ duration:.5, delay:i*.07 }}
+                        onClick={() => setActiveService(srv.id)}
+                        style={{ padding:'13px 18px', borderRadius:14, cursor:'pointer', display:'flex', alignItems:'center', gap:14, transition:'all 0.22s ease', background: active?'#fff':'rgba(255,255,255,0.48)', border: active?`2px solid ${col}`:'2px solid transparent', boxShadow: active?`0 8px 28px ${col}33`:'none', transform: active?'translateX(6px)':'translateX(0)' }}>
+                        <div style={{ width:42, height:42, borderRadius:11, flexShrink:0, background: active?col:'#e2e8f0', color: active?'#fff':'#64748b', display:'flex', alignItems:'center', justifyContent:'center', transition:'all 0.22s', boxShadow: active?`0 4px 12px ${col}44`:'none' }}>
+                          {srv.icon}
+                        </div>
+                        <div style={{ flex:1 }}>
+                          <h3 style={{ margin:0, fontSize:13, fontWeight:800, color:'#0f172a' }}>{srv.title}</h3>
+                          <p style={{ margin:'2px 0 0', fontSize:11, color:'#64748b' }}>{srv.desc}</p>
+                        </div>
+                        <AnimatePresence>
+                          {active && (
+                            <motion.div initial={{ opacity:0, scale:.5 }} animate={{ opacity:1, scale:1 }} exit={{ opacity:0, scale:.5 }} transition={{ duration:.15 }}>
+                              <ChevronRight size={16} color={col}/>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+
+                <motion.div initial={{ opacity:0, y:24 }} animate={section==='services'?{opacity:1,y:0}:{}} transition={{ duration:.55, delay:.32 }}
+                  style={{ background:'#fff', borderRadius:16, overflow:'hidden', border:'1px solid #e2e8f0', boxShadow:'0 20px 50px rgba(0,0,0,0.08)', height:185 }}>
+                  <div style={{ padding:'8px 14px', background:'#f8fafc', borderBottom:'1px solid #e2e8f0', display:'flex', alignItems:'center', gap:10 }}>
+                    <div style={{ display:'flex', gap:5 }}>
+                      {['#ff5f57','#febc2e','#28c840'].map(col => <div key={col} style={{ width:8, height:8, borderRadius:'50%', background:col }}/>)}
                     </div>
-                  ))}
-                </div>
-
-                <div style={S.screenContainer}>
-                   <div style={S.screenHeader}>
-                     <div style={{display:'flex', gap:'6px'}}><div style={S.dot}/><div style={S.dot}/><div style={S.dot}/></div>
-                     <div style={S.urlBar}>exampulse.ai/modules/{activeService.toLowerCase()}</div>
-                   </div>
-                   <div style={S.screenBody}>
-                      <AnimatePresence mode="wait">
-                        <motion.div 
-                          key={activeService}
-                          initial={{ opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.9 }}
-                          style={{textAlign: 'center'}}
-                        >
-                          <MonitorPlay size={45} color={BRAND_BLUE} style={{opacity: 0.7, marginBottom: '15px'}} />
-                          <div style={{fontWeight: '700', fontSize: '18px', color: '#1e293b'}}>{currentScreenText}</div>
-                          <div style={{fontSize: '12px', color: '#94a3b8', marginTop: '5px'}}>Interactive 3D Preview</div>
-                        </motion.div>
-                      </AnimatePresence>
-                   </div>
-                </div>
+                    <div style={{ flex:1, background:'#fff', borderRadius:5, padding:'3px 10px', fontSize:9, color:'#94a3b8', border:'1px solid #e2e8f0', textAlign:'center' }}>
+                      exampulse.ai/modules/{activeService.toLowerCase()}
+                    </div>
+                  </div>
+                  <div style={{ height:'calc(100% - 30px)', display:'flex', alignItems:'center', justifyContent:'center', background:'#fcfdff' }}>
+                    <AnimatePresence mode="wait">
+                      <motion.div key={activeService}
+                        initial={{ opacity:0, scale:.86, y:10 }} animate={{ opacity:1, scale:1, y:0 }} exit={{ opacity:0, scale:.86, y:-10 }} transition={{ duration:.18 }}
+                        style={{ textAlign:'center' }}>
+                        <MonitorPlay size={36} color={SVC_COLOR[activeService]} style={{ opacity:.82, marginBottom:8 }}/>
+                        <div style={{ fontWeight:800, fontSize:14, color:'#1e293b' }}>{currentScreen}</div>
+                        <div style={{ fontSize:10, color:'#94a3b8', marginTop:3 }}>Interactive 3D Preview</div>
+                      </motion.div>
+                    </AnimatePresence>
+                  </div>
+                </motion.div>
               </div>
             </div>
           </section>
-        
+
         </div>
       </div>
-
-      {/* BU YERDAN KEYIN KELADIGAN HAR QANDAY SECTIONGA TOCHKALAR O'TMAYDI */}
-      {/* Misol: How it works */}
-      {/* <section style={{height: '100vh', background: 'white'}}>How it works section...</section> */}
-
-    </div>
-  );
-};
-
-// --- STILLAR ---
-const S = {
-  badge: { display: 'inline-flex', alignItems: 'center', gap: '8px', background: '#fff', padding: '10px 20px', borderRadius: '100px', fontSize: '12px', fontWeight: '800', color: BRAND_BLUE, marginBottom: '30px', border: `1px solid ${BRAND_BLUE}40` },
-  h1: { fontSize: 'clamp(3.5rem, 6vw, 5.5rem)', fontWeight: '900', color: '#0f172a', lineHeight: '0.95', letterSpacing: '-3px', margin: '0 0 25px 0' },
-  desc: { fontSize: '1.2rem', color: '#475569', lineHeight: '1.6', marginBottom: '45px', fontWeight: '500', margin: '0 auto' },
-  h2: { fontSize: '3rem', fontWeight: '900', marginBottom: '15px' },
-  btnPrimary: { background: BRAND_BLUE, color: '#fff', border: 'none', padding: '18px 35px', borderRadius: '15px', fontSize: '16px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' },
-  btnSecondary: { background: '#fff', color: '#1e293b', border: '1px solid #e2e8f0', padding: '18px 35px', borderRadius: '15px', fontSize: '16px', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px' },
-  screenContainer: { background: '#fff', borderRadius: '16px', overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 20px 40px rgba(0,0,0,0.05)', height: '220px' },
-  screenHeader: { padding: '10px 15px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '15px' },
-  dot: { width: '10px', height: '10px', borderRadius: '50%', background: '#cbd5e1' },
-  urlBar: { flex: 1, background: '#fff', padding: '4px', borderRadius: '6px', fontSize: '10px', color: '#94a3b8', textAlign: 'center', border: '1px solid #e2e8f0' },
-  screenBody: { height: 'calc(100% - 35px)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fcfdff' }
-};
-
-export default HeroZenithPro;
+    </>
+  )
+}

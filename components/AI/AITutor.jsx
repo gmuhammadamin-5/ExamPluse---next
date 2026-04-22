@@ -29,20 +29,43 @@ const AITutor = () => {
     if (!userInput.trim() || isLoading) return;
     const userMsg = { type: 'user', text: userInput, timestamp: new Date(), id: Date.now() };
     setConversation(prev => [...prev, userMsg]);
+    const currentInput = userInput;
     setUserInput('');
     setIsLoading(true);
 
-    // AI simulyatsiyasi
-    setTimeout(() => {
-      const aiMsg = { 
-        type: 'ai', 
-        text: "## 💡 Expert Analysis\nBased on your query, at a **Band 7.5** level, you should focus on using more *cohesive devices*.\n\n• **Tip**: Instead of 'But', use 'Notwithstanding'.\n• **Strategy**: Practice inversion for complex sentences.", 
-        timestamp: new Date(), 
-        id: Date.now() + 1 
+    try {
+      const token = localStorage.getItem('access_token');
+      const history = conversation.slice(-10).map(m => ({
+        role: m.type === 'user' ? 'user' : 'assistant',
+        content: m.text
+      }));
+      const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const res = await fetch(`${API}/api/ai/tutor/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ message: currentInput, history, context: null })
+      });
+      const data = await res.json();
+      const aiMsg = {
+        type: 'ai',
+        text: data.reply || 'Xatolik yuz berdi. Qayta urinib ko\'ring.',
+        timestamp: new Date(),
+        id: Date.now() + 1
       };
       setConversation(prev => [...prev, aiMsg]);
+    } catch (err) {
+      setConversation(prev => [...prev, {
+        type: 'ai',
+        text: 'Backend bilan ulanishda xatolik. Server ishlaётganini tekshiring.',
+        timestamp: new Date(),
+        id: Date.now() + 1
+      }]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (

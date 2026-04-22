@@ -148,6 +148,8 @@ const EnhancedWritingTest = ({ onExit }) => {
     const [text, setText] = useState('');
     const [activeKeys, setActiveKeys] = useState(new Set());
     const [timer, setTimer] = useState(0);
+    const [aiResult, setAiResult] = useState(null);
+    const [isEvaluating, setIsEvaluating] = useState(false);
     const textareaRef = useRef(null);
     const timerInterval = useRef(null);
     const [modalConfig, setModalConfig] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
@@ -208,7 +210,30 @@ const EnhancedWritingTest = ({ onExit }) => {
         triggerConfirm(
             "Finish Writing?",
             "Are you sure you want to submit your essay for analysis?",
-            () => setGameState('result')
+            async () => {
+                setGameState('result');
+                setIsEvaluating(true);
+                try {
+                    const token = localStorage.getItem('access_token');
+                    const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+                    const res = await fetch(`${API}/api/ai/evaluate/writing`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(token ? { Authorization: `Bearer ${token}` } : {})
+                        },
+                        body: JSON.stringify({ text, prompt: topic, exam_type: 'IELTS' })
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        setAiResult(data);
+                    }
+                } catch (e) {
+                    console.error('AI eval error:', e);
+                } finally {
+                    setIsEvaluating(false);
+                }
+            }
         );
     }
 
@@ -428,7 +453,7 @@ const EnhancedWritingTest = ({ onExit }) => {
 
     // 3. RESULT SCREEN
     if (gameState === 'result') {
-        const score = Math.min(9, (wordCount / targetWords) * 9).toFixed(1);
+        const score = aiResult ? aiResult.band_score : Math.min(9, (wordCount / targetWords) * 9).toFixed(1);
         
         return (
             <div className="fullscreen-container">

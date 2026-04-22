@@ -6,7 +6,6 @@ import SpeakingTest from '../Tests/SpeakingTest'
 import ReadingTest from '../Tests/ReadingTest'
 import WritingTest from '../Tests/WritingTest'
 import ListeningTest from '../Tests/ListeningTest'
-import '../../styles/App.css'
 
 const TestsSection = () => {
   const { user, openAuthModal } = useAuth()

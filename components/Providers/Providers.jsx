@@ -8,7 +8,8 @@ import { AIProvider } from '@/contexts/AIContext';
 import { GamificationProvider } from '@/contexts/GamificationContext';
 import { ProgressProvider } from '@/contexts/ProgressContext';
 import { CollaborationProvider } from '@/contexts/CollaborationContext';
-import { TestProvider } from '@/components/Tests/TestContext'; 
+import { TestProvider } from '@/components/Tests/TestContext';
+import { UserProvider } from '@/contexts/UserContext';
 
 export default function Providers({ children }) {
   return (
@@ -18,7 +19,9 @@ export default function Providers({ children }) {
           <ProgressProvider>
             <CollaborationProvider>
               <TestProvider>
-                {children}
+                <UserProvider>
+                  {children}
+                </UserProvider>
               </TestProvider>
             </CollaborationProvider>
           </ProgressProvider>

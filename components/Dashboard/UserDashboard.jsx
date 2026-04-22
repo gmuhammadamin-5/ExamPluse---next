@@ -1,33 +1,61 @@
+"use client";
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  TrendingUp, Target, Clock, BookOpen, 
-  Mic, PenTool, Headphones, ChevronRight, 
+import {
+  TrendingUp, Target, Clock, BookOpen,
+  Mic, PenTool, Headphones, ChevronRight,
   Award, Calendar, User, Zap, CheckCircle2,
-  BarChart3, Info, Bell, LogOut, ArrowUpRight, 
+  BarChart3, Info, Bell, LogOut, ArrowUpRight,
   Activity, Sparkles, ListTodo, CheckCircle, Circle,
   History, TrendingDown, BrainCircuit
 } from 'lucide-react';
+import { dashboardApi, resultsApi } from '../../app/lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const ExamPluseEliteFinal = () => {
+  const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activeDay, setActiveDay] = useState('Mon');
   const [completedTasks, setCompletedTasks] = useState([1]);
+  const [stats, setStats] = useState(null);
+  const [recentResults, setRecentResults] = useState([]);
+  const [loadingStats, setLoadingStats] = useState(true);
   const logoRef = useRef(null);
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [s, r] = await Promise.all([dashboardApi.stats(), resultsApi.list({ limit: 6 })]);
+        setStats(s);
+        setRecentResults(r);
+      } catch { /* backend offline — show empty state */ }
+      finally { setLoadingStats(false); }
+    };
+    fetchData();
+  }, []);
+
   const userData = {
-    name: "Abdurakhmon J.",
-    id: "EP-9921",
+    name: user?.full_name || user?.email?.split('@')[0] || "Student",
+    id: `EP-${user?.id || '0000'}`,
     targetScore: 8.5,
-    currentAverage: 7.5,
-    daysLeft: 12,
+    currentAverage: stats ? (stats.average_score / 11.1).toFixed(1) : '—',
+    daysLeft: 30,
   };
 
-  const resultsData = [
-    { id: 1, date: '08 Jan 2026', module: 'Listening', raw: '36/40', band: 8.5, status: 'Improvement' },
-    { id: 2, date: '05 Jan 2026', module: 'Reading', raw: '32/40', band: 7.5, status: 'Stable' },
-    { id: 3, date: '02 Jan 2026', module: 'Writing', raw: 'N/A', band: 6.5, status: 'Needs Focus' },
-    { id: 4, date: '28 Dec 2025', module: 'Speaking', raw: 'N/A', band: 7.0, status: 'Improvement' },
-  ];
+  const resultsData = recentResults.length > 0
+    ? recentResults.map((r, i) => ({
+        id: i + 1,
+        date: new Date(r.created_at || r.date || Date.now()).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }),
+        module: r.section?.charAt(0).toUpperCase() + r.section?.slice(1) || 'Test',
+        raw: r.score ? `${r.score}/100` : 'N/A',
+        band: r.band_score || (r.score / 11.1).toFixed(1),
+        status: r.score >= 75 ? 'Improvement' : r.score >= 55 ? 'Stable' : 'Needs Focus',
+      }))
+    : [
+        { id: 1, date: '—', module: 'Listening', raw: '—', band: '—', status: 'No data' },
+        { id: 2, date: '—', module: 'Reading',   raw: '—', band: '—', status: 'No data' },
+        { id: 3, date: '—', module: 'Writing',   raw: '—', band: '—', status: 'No data' },
+        { id: 4, date: '—', module: 'Speaking',  raw: '—', band: '—', status: 'No data' },
+      ];
 
   const aiInsights = [
     { label: 'Grammatical Range', score: 72, color: '#007bff', feedback: 'Focus on complex structures.' },

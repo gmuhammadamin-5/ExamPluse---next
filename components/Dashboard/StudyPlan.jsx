@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTests } from '../../contexts/TestContext'
-import { Link, useNavigate } from 'react-router-dom'
-import '../../styles/App.css'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 const StudyPlan = () => {
   const { user } = useAuth()
   const { getUserProgress, tests } = useTests()
-  const navigate = useNavigate()
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState('weekly')
   const [completedDays, setCompletedDays] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -17,7 +17,7 @@ const StudyPlan = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate('/')
+      router.push('/')
       return
     }
     
@@ -1190,7 +1190,7 @@ const WeeklyPlanView = ({ weeklyPlan, completedDays, toggleDayCompletion, target
                 marginTop: '15px'
               }}>
                 <Link
-                  to="/tests"
+                  href="/tests"
                   style={{
                     flex: 1,
                     padding: '14px 20px',
@@ -1595,7 +1595,7 @@ const RecommendationsView = ({ recommendedSkills, progress, targetBand, getRecom
 
                 {/* Action Button */}
                 <Link
-                  to="/tests"
+                  href="/tests"
                   style={{
                     display: 'block',
                     width: '100%',

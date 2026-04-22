@@ -1,6 +1,6 @@
+import React from "react";
 import { Plus_Jakarta_Sans } from "next/font/google";
-import "./globals.css"; 
-// Agar CSS faylingiz styles papkasida bo'lsa: import "@/styles/App.css";
+import "./globals.css";
 
 import Providers from "@/components/Providers/Providers";
 import ClientLayout from "@/components/Layout/ClientShell";
@@ -12,12 +12,11 @@ export const metadata = {
   description: "AI IELTS Preparation Platform",
 };
 
-export default function RootLayout({ children }) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className={jakarta.className}>
         <Providers>
-          {/* Loading va Mobile Check shu ClientLayout ichida */}
           <ClientLayout>
             {children}
           </ClientLayout>

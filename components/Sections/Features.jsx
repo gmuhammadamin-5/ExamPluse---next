@@ -1,154 +1,162 @@
-import React, { useState } from 'react';
-import { Send, Instagram, Youtube, Phone, MapPin, Mail, MessageCircle } from 'lucide-react';
+"use client";
+import { useState, useEffect, useRef } from 'react';
+import {
+  Zap, BarChart2, Trophy, Brain, Clock, Shield, Globe, Star
+} from 'lucide-react';
 
-const Footer = () => {
-  const [isHovered, setIsHovered] = useState(false);
+const FEATURES = [
+  {
+    Icon: Zap,       color: '#2563eb', bg: '#eff6ff',
+    title: 'AI-Powered Scoring',
+    desc: 'Every answer is analyzed in real time by AI — giving you an accurate band score instantly.',
+  },
+  {
+    Icon: BarChart2, color: '#7c3aed', bg: '#f5f3ff',
+    title: 'Detailed Analytics',
+    desc: 'See exactly where you went wrong in each section and what to work on next.',
+  },
+  {
+    Icon: Clock,     color: '#0891b2', bg: '#ecfeff',
+    title: 'Real Exam Mode',
+    desc: 'Authentic exam conditions: timer, section sequence, and full mock test format.',
+  },
+  {
+    Icon: Brain,     color: '#059669', bg: '#ecfdf5',
+    title: 'AI Tutor',
+    desc: 'Your personal AI coach for writing and speaking — available anytime, anywhere.',
+  },
+  {
+    Icon: Trophy,    color: '#f59e0b', bg: '#fffbeb',
+    title: 'Leaderboard',
+    desc: 'Compare your progress with other students and stay motivated to reach the top.',
+  },
+  {
+    Icon: Globe,     color: '#ea580c', bg: '#fff7ed',
+    title: '5 Exams Covered',
+    desc: 'IELTS, Cambridge, TOEFL, CEFR and SAT — all in one platform.',
+  },
+  {
+    Icon: Shield,    color: '#2563eb', bg: '#eff6ff',
+    title: 'Free to Start',
+    desc: 'Access many tests without signing up. Upgrade to PRO for unlimited features.',
+  },
+  {
+    Icon: Star,      color: '#7c3aed', bg: '#f5f3ff',
+    title: '98.7% Success Rate',
+    desc: '98.7% of students who used our platform achieved their target band score.',
+  },
+];
 
-  // Background color used for hover effect synchronization
-  const bgColor = '#e6f7ff'; 
+function FeatureCard({ Icon, color, bg, title, desc, delay }) {
+  const [visible, setVisible] = useState(false);
+  const [hov, setHov] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } }, { threshold: 0.15 });
+    if (ref.current) obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, []);
 
   return (
-    <footer style={styles.footer}>
-      <div style={styles.container}>
-        <div style={styles.grid}>
-          
-          {/* BRAND COLUMN */}
-          <div style={styles.column}>
-            <div style={styles.logoWrapper}>
-               <div 
-                  onMouseEnter={() => setIsHovered(true)}
-                  onMouseLeave={() => setIsHovered(false)}
-                  style={{
-                    ...styles.epBadge,
-                    backgroundColor: isHovered ? bgColor : '#3b82f6', 
-                    color: isHovered ? '#3b82f6' : '#FFFFFF',
-                    border: `2px solid ${isHovered ? '#3b82f6' : 'transparent'}`
-                  }}
-               >
-                 EP
-               </div>
-               
-               <h3 style={styles.logoMain}>ExamPulse</h3>
-            </div>
+    <div ref={ref}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        background: '#fff',
+        border: `1.5px solid ${hov ? color + '44' : '#f1f5f9'}`,
+        borderRadius: 20,
+        padding: '28px 24px',
+        cursor: 'default',
+        transition: 'all .3s cubic-bezier(.4,0,.2,1)',
+        transform: visible ? (hov ? 'translateY(-6px)' : 'none') : 'translateY(24px)',
+        opacity: visible ? 1 : 0,
+        transitionDelay: visible ? `${delay}ms` : '0ms',
+        boxShadow: hov ? `0 16px 40px ${color}22` : '0 2px 8px rgba(0,0,0,0.05)',
+      }}>
+      <div style={{ width: 48, height: 48, borderRadius: 14, background: bg, border: `1px solid ${color}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+        <Icon size={22} color={color} />
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>{title}</div>
+      <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.65 }}>{desc}</div>
+    </div>
+  );
+}
 
-            <p style={styles.about}>
-              The ultimate IELTS mock test platform. We provide innovative solutions and real-exam environments to help you achieve your target band score.
-            </p>
-            
-            <div style={styles.socials}>
-              {/* INSTAGRAM HAVOLASI YANGILANDI */}
-              <a 
-                href="https://www.instagram.com/ielts_bakhromov?igsh=ZXZ6cmdtNjdocDVx" 
-                target="_blank" 
-                rel="noreferrer" 
-                style={styles.socialIcon}
-              >
-                <Instagram size={20} />
-              </a>
+export default function Features() {
+  const [visible, setVisible] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } }, { threshold: 0.1 });
+    if (ref.current) obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, []);
 
-              <a href="https://t.me/+xhTgEC_plI1jYWUy" target="_blank" rel="noreferrer" style={styles.socialIcon}>
-                <Send size={20} />
-              </a>
-              
-              <a href="#" style={styles.socialIcon}><Youtube size={20} /></a>
-            </div>
+  return (
+    <section ref={ref} style={{
+      padding: '100px 20px',
+      background: 'linear-gradient(135deg, #f0f8ff 0%, #e6f7ff 50%, #d6f0ff 100%)',
+      fontFamily: "'Plus Jakarta Sans',system-ui,sans-serif",
+    }}>
+      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+        {/* header */}
+        <div style={{
+          textAlign: 'center', marginBottom: 60,
+          transform: visible ? 'none' : 'translateY(20px)',
+          opacity: visible ? 1 : 0,
+          transition: 'all .6s cubic-bezier(.4,0,.2,1)',
+        }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#eff6ff', border: '1px solid rgba(37,99,235,0.2)', borderRadius: 30, padding: '4px 14px', marginBottom: 14 }}>
+            <Star size={11} color="#2563eb" />
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#2563eb', letterSpacing: '1.5px' }}>FEATURES</span>
           </div>
-
-          {/* PLATFORM LINKS */}
-          <div style={styles.column}>
-            <h4 style={styles.colTitle}>Platform</h4>
-            <ul style={styles.list}>
-              <li style={styles.listItem}><a href="#" style={styles.link}>Take an Exam</a></li>
-              <li style={styles.listItem}><a href="#" style={styles.link}>Our Centers</a></li>
-              <li style={styles.listItem}><a href="#" style={styles.link}>Verify Results</a></li>
-              <li style={styles.listItem}><a href="#" style={styles.link}>Help Center</a></li>
-            </ul>
-          </div>
-
-          {/* CONTACT & TELEGRAM */}
-          <div style={styles.column}>
-            <h4 style={styles.colTitle}>Contact</h4>
-            <ul style={styles.list}>
-              <li style={styles.contactItem}>
-                <div style={styles.iconCircle}><Phone size={16} color="#3b82f6" /></div>
-                <span>+998 90 336 20 12</span>
-              </li>
-              <li style={styles.contactItem}>
-                <div style={styles.iconCircle}><Mail size={16} color="#3b82f6" /></div>
-                <span>support@exampulse.ai</span>
-              </li>
-              <li style={styles.contactItem}>
-                <a href="https://t.me/+xhTgEC_plI1jYWUy" target="_blank" rel="noreferrer" style={styles.telegramLink}>
-                  <div style={styles.iconCircle}><MessageCircle size={16} color="#fff" style={{fill: '#3b82f6'}} /></div>
-                  <span>Join ExamPulse Channel</span>
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          {/* NEWSLETTER */}
-          <div style={styles.column}>
-            <h4 style={styles.colTitle}>Newsletter</h4>
-            <p style={styles.newsletterText}>Stay updated with the latest exam dates and exclusive offers.</p>
-            <div style={styles.inputGroup}>
-              <input type="email" placeholder="Your Email" style={styles.input} />
-              <button style={styles.inputBtn}><Send size={18} /></button>
-            </div>
-          </div>
-
+          <h2 style={{ fontSize: 36, fontWeight: 900, color: '#0f172a', marginBottom: 12, letterSpacing: '-0.5px' }}>
+            Why ExamPulse?
+          </h2>
+          <p style={{ fontSize: 15, color: '#64748b', maxWidth: 520, margin: '0 auto', lineHeight: 1.7 }}>
+            The most advanced AI-powered exam preparation platform — simulating the real exam experience.
+          </p>
         </div>
 
-        {/* BOTTOM BAR */}
-        <div style={styles.bottomBar}>
-          <p>© {new Date().getFullYear()} ExamPulse Platform. All rights reserved.</p>
+        {/* grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+          {FEATURES.map((f, i) => (
+            <FeatureCard key={f.title} {...f} delay={i * 60} />
+          ))}
+        </div>
+
+        {/* bottom stats */}
+        <div style={{
+          marginTop: 56,
+          background: 'linear-gradient(135deg,#2563eb,#7c3aed)',
+          borderRadius: 24,
+          padding: '36px 40px',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4,1fr)',
+          gap: 24,
+          opacity: visible ? 1 : 0,
+          transform: visible ? 'none' : 'translateY(20px)',
+          transition: 'all .7s .3s cubic-bezier(.4,0,.2,1)',
+        }}>
+          {[
+            { val: '56+',    label: 'Mock Tests'        },
+            { val: '18K+',   label: 'Active Students'   },
+            { val: '98.7%',  label: 'Success Rate'      },
+            { val: '5',      label: 'International Exams' },
+          ].map(s => (
+            <div key={s.label} style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 32, fontWeight: 900, color: '#fff', marginBottom: 4 }}>{s.val}</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', fontWeight: 600 }}>{s.label}</div>
+            </div>
+          ))}
         </div>
       </div>
-    </footer>
+
+      <style>{`
+        @media(max-width:1024px){ .feat-grid{grid-template-columns:repeat(3,1fr)!important} }
+        @media(max-width:700px) { .feat-grid{grid-template-columns:repeat(2,1fr)!important} }
+        @media(max-width:440px) { .feat-grid{grid-template-columns:1fr!important} }
+      `}</style>
+    </section>
   );
-};
-
-const styles = {
-  footer: {
-    padding: '100px 0 40px 0',
-    background: 'linear-gradient(135deg, #f0f8ff 0%, #e6f7ff 50%, #d6f0ff 100%)',
-    fontFamily: "'Plus Jakarta Sans', sans-serif",
-    borderTop: '1px solid rgba(255, 255, 255, 0.6)',
-  },
-  container: { maxWidth: '1240px', margin: '0 auto', padding: '0 40px' },
-  grid: { 
-    display: 'grid', 
-    gridTemplateColumns: '1.5fr 0.8fr 1.2fr 1fr', 
-    gap: '40px',
-    marginBottom: '60px'
-  },
-  logoWrapper: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '25px' },
-  epBadge: {
-    width: '42px', height: '42px', borderRadius: '10px',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontWeight: '800', fontSize: '16px', cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 5px 15px rgba(59, 130, 246, 0.15)'
-  },
-  logoMain: { fontSize: '28px', fontWeight: '800', color: '#3b82f6', margin: 0, letterSpacing: '-1.5px' },
-  about: { fontSize: '15px', color: '#4b5563', lineHeight: '1.7', marginBottom: '30px', maxWidth: '350px' },
-  socials: { display: 'flex', gap: '10px' },
-  socialIcon: { 
-    width: '38px', height: '38px', background: '#FFFFFF', borderRadius: '10px', 
-    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6',
-    boxShadow: '0 4px 10px rgba(0,0,0,0.05)', transition: 'all 0.3s', textDecoration: 'none'
-  },
-  colTitle: { fontSize: '14px', fontWeight: '800', color: '#1a1a1a', marginBottom: '25px', textTransform: 'uppercase', letterSpacing: '1px' },
-  list: { listStyle: 'none', padding: 0, margin: 0 },
-  listItem: { marginBottom: '12px' },
-  link: { textDecoration: 'none', color: '#4b5563', fontSize: '14px', fontWeight: '500', transition: '0.3s' },
-  contactItem: { display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px', color: '#1a1a1a', fontWeight: '600', fontSize: '14px' },
-  telegramLink: { display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none', color: '#3b82f6', fontWeight: '700' },
-  iconCircle: { width: '30px', height: '30px', background: '#FFFFFF', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 3px 6px rgba(0,0,0,0.05)' },
-  newsletterText: { fontSize: '14px', color: '#4b5563', marginBottom: '20px', lineHeight: '1.6' },
-  inputGroup: { display: 'flex', position: 'relative' },
-  input: { width: '100%', padding: '12px 15px', borderRadius: '12px', border: '1px solid #FFFFFF', background: '#FFFFFF', outline: 'none', fontSize: '13px', boxShadow: '0 5px 10px rgba(0,0,0,0.02)' },
-  inputBtn: { position: 'absolute', right: '4px', top: '4px', bottom: '4px', background: '#3b82f6', border: 'none', borderRadius: '10px', color: '#fff', padding: '0 10px', cursor: 'pointer' },
-  bottomBar: { borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: '30px', textAlign: 'center', fontSize: '13px', color: '#64748b' }
-};
-
-export default Footer;
+}

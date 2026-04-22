@@ -35,15 +35,15 @@ const Header = () => {
     { path: '/pricing', name: 'Pricing' },
     { path: '/test-mock', name: 'Tests' },
     { path: '/contact', name: 'Contact' },
-    { path: '/group-chat', name: 'Global Chat'},
-    { path: '/', name: 'Lessons'},
+    { path: '/global-chat', name: 'Global Chat', icon: '💬' },
+    { path: '/lessons', name: 'Lessons' },
   ];
 
   const aiTutorSections = [
     { id: 1, path: '/ai-tutor', name: 'AI IELTS Tutor', icon: <GraduationCap size={22} />, color: '#3b82f6' },
     { id: 2, path: '/writing-evaluator', name: 'Writing Evaluator', icon: <PenTool size={22} />, color: '#FF3B30' },
     { id: 3, path: '/speaking-evaluator', name: 'Speaking Coach', icon: <Mic2 size={22} />, color: '#AF52DE' },
-    { id: 4, path: '/vocabulary-helper', name: 'Vocabulary Master', icon: <Sparkles size={22} />, color: '#FF9500' }
+    { id: 4, path: '/vocabulary', name: 'Vocabulary Master', icon: <Sparkles size={22} />, color: '#FF9500' }
   ];
 
   const isActive = (path) => {
@@ -52,7 +52,7 @@ const Header = () => {
     return pathname?.startsWith(path);
   };
 
-  const brandColor = '#3b82f6';
+  const brandColor = '#007bff';
 
   return (
     <>
@@ -83,6 +83,7 @@ const Header = () => {
                   opacity: isActive(section.path) ? 1 : 0.6
                 }}
               >
+                {section.icon && <span style={{marginRight:3}}>{section.icon}</span>}
                 {section.name}
                 {isActive(section.path) && <div style={{...styles.activePill, background: brandColor}} />}
               </div>
