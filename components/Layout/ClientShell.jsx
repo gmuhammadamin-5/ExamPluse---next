@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import Header from '@/components/Layout/Header';
 import Footer from '@/components/Layout/Footer';
 import Loading from '@/components/Layout/Loading';
+import AuthModal from '@/components/Auth/AuthModal';
 
 const NO_SHELL = ['/admin'];
 
@@ -27,6 +28,7 @@ export default function ClientShell({ children }) {
       <Header />
       <main>{children}</main>
       <Footer />
+      <AuthModal />
     </div>
   );
 }
