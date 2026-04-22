@@ -61,40 +61,80 @@ function MorphingParticles({ section, activeService, mouseRef }) {
       sphere[i3+1] = r * Math.sin(theta) * Math.sin(phi)
       sphere[i3+2] = r * Math.cos(phi)
     }
+    // Speaking: person silhouette (head+body) + large speech bubble with 3 dots
     const speaking = sampleShape(count, (c, s) => {
-      c.beginPath(); c.arc(s*.5, s*.26, s*.13, 0, Math.PI*2); c.fill()
-      c.beginPath(); c.ellipse(s*.5, s*.56, s*.17, s*.2, 0, 0, Math.PI*2); c.fill()
-      c.beginPath(); c.roundRect(s*.58, s*.13, s*.33, s*.22, s*.04); c.fill()
-      c.beginPath(); c.moveTo(s*.62, s*.35); c.lineTo(s*.56, s*.43); c.lineTo(s*.72, s*.35); c.fill()
-    })
-    const listening = sampleShape(count, (c, s) => {
+      // person head
+      c.beginPath(); c.arc(s*.28, s*.62, s*.11, 0, Math.PI*2); c.fill()
+      // person body
+      c.beginPath(); c.ellipse(s*.28, s*.83, s*.15, s*.13, 0, 0, Math.PI*2); c.fill()
+      // large speech bubble circle
+      c.beginPath(); c.arc(s*.63, s*.32, s*.26, 0, Math.PI*2); c.fill()
+      // bubble tail pointing toward person
       c.beginPath()
-      c.arc(s*.38, s*.5, s*.19, Math.PI*.6, Math.PI*1.4, true)
-      c.arc(s*.38, s*.5, s*.09, Math.PI*1.4, Math.PI*.6, false)
+      c.moveTo(s*.40, s*.50); c.lineTo(s*.33, s*.60); c.lineTo(s*.52, s*.52)
       c.fill()
-      c.lineWidth = s*.024; c.strokeStyle = '#fff'
-      c.beginPath(); c.arc(s*.38, s*.5, s*.30, -Math.PI*.35, Math.PI*.35); c.stroke()
-      c.beginPath(); c.arc(s*.38, s*.5, s*.42, -Math.PI*.35, Math.PI*.35); c.stroke()
-      c.beginPath(); c.arc(s*.38, s*.5, s*.54, -Math.PI*.35, Math.PI*.35); c.stroke()
+      // 3 dots inside bubble (punch out black)
+      c.fillStyle = '#000'
+      c.beginPath(); c.arc(s*.50, s*.32, s*.035, 0, Math.PI*2); c.fill()
+      c.beginPath(); c.arc(s*.63, s*.32, s*.035, 0, Math.PI*2); c.fill()
+      c.beginPath(); c.arc(s*.76, s*.32, s*.035, 0, Math.PI*2); c.fill()
+      c.fillStyle = '#fff'
     })
+
+    // Listening: headphones shape — thick arc + two ear cups
+    const listening = sampleShape(count, (c, s) => {
+      // headband — thick outer arc
+      c.lineWidth = s * .07; c.strokeStyle = '#fff'
+      c.beginPath(); c.arc(s*.5, s*.50, s*.30, Math.PI, 0); c.stroke()
+      // left ear cup
+      c.beginPath(); c.roundRect(s*.12, s*.46, s*.12, s*.26, s*.03); c.fill()
+      // right ear cup
+      c.beginPath(); c.roundRect(s*.76, s*.46, s*.12, s*.26, s*.03); c.fill()
+      // inner ear pad cutout (make it look like real headphones)
+      c.fillStyle = '#000'
+      c.beginPath(); c.roundRect(s*.155, s*.50, s*.065, s*.18, s*.02); c.fill()
+      c.beginPath(); c.roundRect(s*.785, s*.50, s*.065, s*.18, s*.02); c.fill()
+      c.fillStyle = '#fff'
+    })
+
+    // Reading: open book (two pages spread)
     const reading = sampleShape(count, (c, s) => {
       c.beginPath()
-      c.moveTo(s*.5, s*.18); c.quadraticCurveTo(s*.35, s*.2, s*.1, s*.15)
-      c.lineTo(s*.1, s*.82); c.quadraticCurveTo(s*.35, s*.86, s*.5, s*.82)
+      c.moveTo(s*.5, s*.18); c.quadraticCurveTo(s*.35, s*.20, s*.10, s*.15)
+      c.lineTo(s*.10, s*.82); c.quadraticCurveTo(s*.35, s*.86, s*.5, s*.82)
       c.closePath(); c.fill()
       c.beginPath()
-      c.moveTo(s*.5, s*.18); c.quadraticCurveTo(s*.65, s*.2, s*.9, s*.15)
-      c.lineTo(s*.9, s*.82); c.quadraticCurveTo(s*.65, s*.86, s*.5, s*.82)
+      c.moveTo(s*.5, s*.18); c.quadraticCurveTo(s*.65, s*.20, s*.90, s*.15)
+      c.lineTo(s*.90, s*.82); c.quadraticCurveTo(s*.65, s*.86, s*.5, s*.82)
       c.closePath(); c.fill()
+      // spine line
+      c.fillStyle = '#000'; c.fillRect(s*.48, s*.18, s*.04, s*.64); c.fillStyle = '#fff'
     })
+
+    // Writing: open book + diagonal pen crossing over it
     const writing = sampleShape(count, (c, s) => {
-      c.beginPath(); c.roundRect(s*.12, s*.08, s*.52, s*.76, s*.03); c.fill()
+      // book left page
+      c.beginPath()
+      c.moveTo(s*.48, s*.22); c.quadraticCurveTo(s*.33, s*.24, s*.10, s*.19)
+      c.lineTo(s*.10, s*.80); c.quadraticCurveTo(s*.33, s*.84, s*.48, s*.80)
+      c.closePath(); c.fill()
+      // book right page
+      c.beginPath()
+      c.moveTo(s*.52, s*.22); c.quadraticCurveTo(s*.67, s*.24, s*.88, s*.19)
+      c.lineTo(s*.88, s*.80); c.quadraticCurveTo(s*.67, s*.84, s*.52, s*.80)
+      c.closePath(); c.fill()
+      // page lines on left (black)
       c.fillStyle = '#000'
-      for (let i = 0; i < 6; i++) c.fillRect(s*.2, s*.2 + i * s*.09, s*.36, s*.018)
+      for (let i = 0; i < 5; i++) c.fillRect(s*.16, s*.30 + i*s*.09, s*.28, s*.016)
       c.fillStyle = '#fff'
-      c.fillRect(s*.72, s*.1, s*.1, s*.6)
-      c.beginPath(); c.moveTo(s*.72, s*.7); c.lineTo(s*.77, s*.84); c.lineTo(s*.82, s*.7); c.fill()
-      c.fillStyle = '#000'; c.fillRect(s*.72, s*.1, s*.1, s*.07)
+      // diagonal pen — rotated rectangle
+      c.save()
+      c.translate(s*.72, s*.28)
+      c.rotate(Math.PI * 0.72)
+      c.fillRect(-s*.04, -s*.28, s*.08, s*.52)   // pen body
+      c.fillStyle = '#000'; c.fillRect(-s*.04, -s*.28, s*.08, s*.06); c.fillStyle = '#fff' // pen cap
+      c.beginPath(); c.moveTo(-s*.04, s*.24); c.lineTo(0, s*.38); c.lineTo(s*.04, s*.24); c.fill() // tip
+      c.restore()
     })
     return { sphere, speaking, listening, reading, writing }
   }, [])
