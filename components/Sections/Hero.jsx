@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useMemo, useState, useEffect } from 'react';
+import { useRef, useMemo, useState, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -61,79 +61,77 @@ function MorphingParticles({ section, activeService, mouseRef }) {
       sphere[i3+1] = r * Math.sin(theta) * Math.sin(phi)
       sphere[i3+2] = r * Math.cos(phi)
     }
-    // Speaking: person silhouette (head+body) + large speech bubble with 3 dots
+    // Speaking: person head/body (lower-left) + big speech bubble (upper-right) connected
     const speaking = sampleShape(count, (c, s) => {
-      // person head
-      c.beginPath(); c.arc(s*.28, s*.62, s*.11, 0, Math.PI*2); c.fill()
-      // person body
-      c.beginPath(); c.ellipse(s*.28, s*.83, s*.15, s*.13, 0, 0, Math.PI*2); c.fill()
-      // large speech bubble circle
-      c.beginPath(); c.arc(s*.63, s*.32, s*.26, 0, Math.PI*2); c.fill()
-      // bubble tail pointing toward person
+      // big speech bubble — filled circle
+      c.beginPath(); c.arc(s*.60, s*.35, s*.30, 0, Math.PI*2); c.fill()
+      // bubble tail
       c.beginPath()
-      c.moveTo(s*.40, s*.50); c.lineTo(s*.33, s*.60); c.lineTo(s*.52, s*.52)
+      c.moveTo(s*.34, s*.58); c.lineTo(s*.24, s*.74); c.lineTo(s*.46, s*.60)
       c.fill()
-      // 3 dots inside bubble (punch out black)
+      // person head
+      c.beginPath(); c.arc(s*.20, s*.80, s*.10, 0, Math.PI*2); c.fill()
+      // 3 dots punched out (black)
       c.fillStyle = '#000'
-      c.beginPath(); c.arc(s*.50, s*.32, s*.035, 0, Math.PI*2); c.fill()
-      c.beginPath(); c.arc(s*.63, s*.32, s*.035, 0, Math.PI*2); c.fill()
-      c.beginPath(); c.arc(s*.76, s*.32, s*.035, 0, Math.PI*2); c.fill()
+      c.beginPath(); c.arc(s*.48, s*.35, s*.045, 0, Math.PI*2); c.fill()
+      c.beginPath(); c.arc(s*.60, s*.35, s*.045, 0, Math.PI*2); c.fill()
+      c.beginPath(); c.arc(s*.72, s*.35, s*.045, 0, Math.PI*2); c.fill()
       c.fillStyle = '#fff'
     })
 
-    // Listening: headphones shape — thick arc + two ear cups
+    // Listening: headphones — thick horseshoe arc + two big ear cups
     const listening = sampleShape(count, (c, s) => {
-      // headband — thick outer arc
-      c.lineWidth = s * .07; c.strokeStyle = '#fff'
-      c.beginPath(); c.arc(s*.5, s*.50, s*.30, Math.PI, 0); c.stroke()
+      // outer arc (headband)
+      c.lineWidth = s*.10; c.strokeStyle = '#fff'
+      c.beginPath(); c.arc(s*.50, s*.44, s*.28, Math.PI*1.05, Math.PI*1.95, false); c.stroke()
       // left ear cup
-      c.beginPath(); c.roundRect(s*.12, s*.46, s*.12, s*.26, s*.03); c.fill()
+      c.fillRect(s*.09, s*.42, s*.16, s*.34)
       // right ear cup
-      c.beginPath(); c.roundRect(s*.76, s*.46, s*.12, s*.26, s*.03); c.fill()
-      // inner ear pad cutout (make it look like real headphones)
+      c.fillRect(s*.75, s*.42, s*.16, s*.34)
+      // inner cutout (black) — inner part of ear cup
       c.fillStyle = '#000'
-      c.beginPath(); c.roundRect(s*.155, s*.50, s*.065, s*.18, s*.02); c.fill()
-      c.beginPath(); c.roundRect(s*.785, s*.50, s*.065, s*.18, s*.02); c.fill()
+      c.fillRect(s*.135, s*.47, s*.07, s*.24)
+      c.fillRect(s*.795, s*.47, s*.07, s*.24)
       c.fillStyle = '#fff'
     })
 
-    // Reading: open book (two pages spread)
+    // Reading: open book — two spread pages with spine
     const reading = sampleShape(count, (c, s) => {
+      // left page
       c.beginPath()
-      c.moveTo(s*.5, s*.18); c.quadraticCurveTo(s*.35, s*.20, s*.10, s*.15)
-      c.lineTo(s*.10, s*.82); c.quadraticCurveTo(s*.35, s*.86, s*.5, s*.82)
+      c.moveTo(s*.50, s*.16); c.quadraticCurveTo(s*.33, s*.19, s*.08, s*.14)
+      c.lineTo(s*.08, s*.82); c.quadraticCurveTo(s*.33, s*.87, s*.50, s*.82)
       c.closePath(); c.fill()
+      // right page
       c.beginPath()
-      c.moveTo(s*.5, s*.18); c.quadraticCurveTo(s*.65, s*.20, s*.90, s*.15)
-      c.lineTo(s*.90, s*.82); c.quadraticCurveTo(s*.65, s*.86, s*.5, s*.82)
+      c.moveTo(s*.50, s*.16); c.quadraticCurveTo(s*.67, s*.19, s*.92, s*.14)
+      c.lineTo(s*.92, s*.82); c.quadraticCurveTo(s*.67, s*.87, s*.50, s*.82)
       c.closePath(); c.fill()
-      // spine line
-      c.fillStyle = '#000'; c.fillRect(s*.48, s*.18, s*.04, s*.64); c.fillStyle = '#fff'
+      // spine gap (black)
+      c.fillStyle = '#000'; c.fillRect(s*.47, s*.14, s*.06, s*.70); c.fillStyle = '#fff'
     })
 
-    // Writing: open book + diagonal pen crossing over it
+    // Writing: open book + thick diagonal pen crossing it
     const writing = sampleShape(count, (c, s) => {
-      // book left page
+      // left page
       c.beginPath()
-      c.moveTo(s*.48, s*.22); c.quadraticCurveTo(s*.33, s*.24, s*.10, s*.19)
-      c.lineTo(s*.10, s*.80); c.quadraticCurveTo(s*.33, s*.84, s*.48, s*.80)
+      c.moveTo(s*.48, s*.18); c.quadraticCurveTo(s*.32, s*.21, s*.08, s*.16)
+      c.lineTo(s*.08, s*.78); c.quadraticCurveTo(s*.32, s*.83, s*.48, s*.78)
       c.closePath(); c.fill()
-      // book right page
+      // right page
       c.beginPath()
-      c.moveTo(s*.52, s*.22); c.quadraticCurveTo(s*.67, s*.24, s*.88, s*.19)
-      c.lineTo(s*.88, s*.80); c.quadraticCurveTo(s*.67, s*.84, s*.52, s*.80)
+      c.moveTo(s*.52, s*.18); c.quadraticCurveTo(s*.68, s*.21, s*.88, s*.16)
+      c.lineTo(s*.88, s*.78); c.quadraticCurveTo(s*.68, s*.83, s*.52, s*.78)
       c.closePath(); c.fill()
-      // page lines on left (black)
-      c.fillStyle = '#000'
-      for (let i = 0; i < 5; i++) c.fillRect(s*.16, s*.30 + i*s*.09, s*.28, s*.016)
-      c.fillStyle = '#fff'
-      // diagonal pen — rotated rectangle
+      // spine (black)
+      c.fillStyle = '#000'; c.fillRect(s*.455, s*.16, s*.09, s*.64); c.fillStyle = '#fff'
+      // pen body — thick diagonal
       c.save()
-      c.translate(s*.72, s*.28)
-      c.rotate(Math.PI * 0.72)
-      c.fillRect(-s*.04, -s*.28, s*.08, s*.52)   // pen body
-      c.fillStyle = '#000'; c.fillRect(-s*.04, -s*.28, s*.08, s*.06); c.fillStyle = '#fff' // pen cap
-      c.beginPath(); c.moveTo(-s*.04, s*.24); c.lineTo(0, s*.38); c.lineTo(s*.04, s*.24); c.fill() // tip
+      c.translate(s*.68, s*.24)
+      c.rotate(Math.PI * 0.68)
+      c.fillRect(-s*.055, -s*.30, s*.11, s*.52)    // body
+      c.fillStyle = '#222'; c.fillRect(-s*.055, -s*.30, s*.11, s*.08); c.fillStyle = '#fff' // cap
+      c.beginPath(); c.moveTo(-s*.055, s*.22); c.lineTo(0, s*.40); c.lineTo(s*.055, s*.22); c.fill() // tip
       c.restore()
     })
     return { sphere, speaking, listening, reading, writing }
@@ -205,8 +203,8 @@ function MorphingParticles({ section, activeService, mouseRef }) {
       m.rotation.y = THREE.MathUtils.lerp(m.rotation.y, mx * 0.5 + t * 0.001, 0.04)
       m.rotation.x = THREE.MathUtils.lerp(m.rotation.x, -my * 0.3 + Math.sin(t * 0.15) * 0.08, 0.04)
     } else {
-      m.rotation.y += 0.0008
-      m.rotation.x = THREE.MathUtils.lerp(m.rotation.x, -my * 0.12, 0.03)
+      m.rotation.y = THREE.MathUtils.lerp(m.rotation.y, 0, 0.02)
+      m.rotation.x = THREE.MathUtils.lerp(m.rotation.x, 0, 0.02)
     }
 
     for (let i = 0; i < count; i++) {
