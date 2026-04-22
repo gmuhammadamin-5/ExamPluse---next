@@ -61,22 +61,22 @@ function MorphingParticles({ section, activeService, mouseRef }) {
       sphere[i3+1] = r * Math.sin(theta) * Math.sin(phi)
       sphere[i3+2] = r * Math.cos(phi)
     }
-    // Speaking: person head/body (lower-left) + big speech bubble (upper-right) connected
+    // Speaking: person (head circle + shoulder dome) lower-left + rounded-rect speech bubble upper-right
     const speaking = sampleShape(count, (c, s) => {
-      // big speech bubble — filled circle
-      c.beginPath(); c.arc(s*.60, s*.35, s*.30, 0, Math.PI*2); c.fill()
-      // bubble tail
+      // person head — large circle
+      c.beginPath(); c.arc(s*.24, s*.50, s*.145, 0, Math.PI*2); c.fill()
+      // person shoulders — top semicircle (dome)
       c.beginPath()
-      c.moveTo(s*.34, s*.58); c.lineTo(s*.24, s*.74); c.lineTo(s*.46, s*.60)
+      c.arc(s*.24, s*.88, s*.23, Math.PI, 0)
+      c.closePath(); c.fill()
+      // speech bubble — rounded rectangle upper right
+      c.beginPath(); c.roundRect(s*.41, s*.07, s*.53, s*.47, s*.07); c.fill()
+      // bubble tail pointing left-down toward person head
+      c.beginPath()
+      c.moveTo(s*.43, s*.53)
+      c.lineTo(s*.36, s*.64)
+      c.lineTo(s*.56, s*.53)
       c.fill()
-      // person head
-      c.beginPath(); c.arc(s*.20, s*.80, s*.10, 0, Math.PI*2); c.fill()
-      // 3 dots punched out (black)
-      c.fillStyle = '#000'
-      c.beginPath(); c.arc(s*.48, s*.35, s*.045, 0, Math.PI*2); c.fill()
-      c.beginPath(); c.arc(s*.60, s*.35, s*.045, 0, Math.PI*2); c.fill()
-      c.beginPath(); c.arc(s*.72, s*.35, s*.045, 0, Math.PI*2); c.fill()
-      c.fillStyle = '#fff'
     })
 
     // Listening: headphones — thick horseshoe arc + two big ear cups
