@@ -1,15 +1,65 @@
-// components/AI/AITutor.jsx
+"use client";
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Send, Sparkles, Target, Zap, BarChart3, Clock, 
-  CheckCircle2, TrendingUp, ChevronRight, BrainCircuit, 
-  MessageSquare, ShieldCheck 
+import {
+  Send, Sparkles, Target, Zap, BarChart3, Clock,
+  CheckCircle2, TrendingUp, ChevronRight, BrainCircuit,
+  MessageSquare, ShieldCheck, Crown, Lock
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
-// 1. RANGNI TEPADA E'LON QILAMIZ (Shunda styles uni ko'radi)
 const BRAND_COLOR = '#3b82f6';
 
+// ─── Paywall Screen ───────────────────────────────────────────────────────────
+function ProWall({ isAuthenticated, openAuthModal }) {
+  return (
+    <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#f0f8ff,#e6f7ff)', padding: '40px 20px' }}>
+      <div style={{ background: '#fff', borderRadius: 24, padding: '48px 40px', maxWidth: 480, width: '100%', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.08)' }}>
+        <div style={{ width: 72, height: 72, borderRadius: 20, background: 'linear-gradient(135deg,#f59e0b,#f97316)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+          <Crown size={32} color="#fff" />
+        </div>
+        <h2 style={{ fontSize: 26, fontWeight: 900, color: '#0f172a', margin: '0 0 12px' }}>AI Tutor — Pro Feature</h2>
+        <p style={{ fontSize: 15, color: '#64748b', margin: '0 0 32px', lineHeight: 1.7 }}>
+          {isAuthenticated
+            ? 'Get personalized AI coaching, instant feedback, and adaptive lesson plans. Upgrade to Pro to unlock.'
+            : 'Sign up for free and upgrade to Pro to get AI-powered personalized IELTS coaching.'}
+        </p>
+        <div style={{ background: '#f8faff', borderRadius: 16, padding: '20px 24px', marginBottom: 28, textAlign: 'left' }}>
+          {[
+            'Personalized learning plan based on your results',
+            'Unlimited AI chat sessions',
+            'Writing & Speaking AI evaluation',
+            'Progress tracking & band score prediction',
+          ].map((f, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: i < 3 ? 12 : 0 }}>
+              <CheckCircle2 size={16} color={BRAND_COLOR} />
+              <span style={{ fontSize: 13, color: '#334155', fontWeight: 600 }}>{f}</span>
+            </div>
+          ))}
+        </div>
+        {isAuthenticated ? (
+          <a href="/pricing" style={{ display: 'block', background: BRAND_COLOR, color: '#fff', borderRadius: 14, padding: '15px 0', fontSize: 16, fontWeight: 800, textDecoration: 'none' }}>
+            Upgrade to Pro
+          </a>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button onClick={() => openAuthModal('register')} style={{ background: BRAND_COLOR, color: '#fff', border: 'none', borderRadius: 14, padding: '15px 0', fontSize: 16, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}>
+              Register Free
+            </button>
+            <button onClick={() => openAuthModal('login')} style={{ background: '#f1f5f9', color: '#334155', border: 'none', borderRadius: 14, padding: '13px 0', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}>
+              Already have an account? Log in
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 const AITutor = () => {
+  const { user, isAuthenticated, openAuthModal } = useAuth();
+  const isPro = user?.plan === 'pro' || user?.is_premium || false;
+
   const [conversation, setConversation] = useState([
     {
       type: 'ai',
@@ -20,10 +70,22 @@ const AITutor = () => {
   ]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   useEffect(() => { scrollToBottom(); }, [conversation]);
+
+  if (!isAuthenticated || !isPro) {
+    return <ProWall isAuthenticated={isAuthenticated} openAuthModal={openAuthModal} />;
+  }
 
   const handleSendMessage = async () => {
     if (!userInput.trim() || isLoading) return;
@@ -39,7 +101,7 @@ const AITutor = () => {
         role: m.type === 'user' ? 'user' : 'assistant',
         content: m.text
       }));
-      const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const res = await fetch(`${API}/api/ai/tutor/chat`, {
         method: 'POST',
         headers: {
@@ -49,17 +111,16 @@ const AITutor = () => {
         body: JSON.stringify({ message: currentInput, history, context: null })
       });
       const data = await res.json();
-      const aiMsg = {
-        type: 'ai',
-        text: data.reply || 'Xatolik yuz berdi. Qayta urinib ko\'ring.',
-        timestamp: new Date(),
-        id: Date.now() + 1
-      };
-      setConversation(prev => [...prev, aiMsg]);
-    } catch (err) {
       setConversation(prev => [...prev, {
         type: 'ai',
-        text: 'Backend bilan ulanishda xatolik. Server ishlaётganini tekshiring.',
+        text: data.reply || "Xatolik yuz berdi. Qayta urinib ko'ring.",
+        timestamp: new Date(),
+        id: Date.now() + 1
+      }]);
+    } catch {
+      setConversation(prev => [...prev, {
+        type: 'ai',
+        text: 'Backend bilan ulanishda xatolik.',
         timestamp: new Date(),
         id: Date.now() + 1
       }]);
@@ -69,160 +130,125 @@ const AITutor = () => {
   };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.appContainer}>
-        
-        {/* LEFT: SIDEBAR */}
-        <aside style={styles.sidebar}>
-          <div style={styles.brandBox}>
-            <div style={styles.epIcon}><BrainCircuit size={22} color="white" /></div>
-            <div>
-              <h3 style={styles.brandName}>ExamPulse AI</h3>
-              <span style={styles.brandTag}>Neural Mentor</span>
-            </div>
-          </div>
+    <div style={{ padding: isMobile ? '80px 0 20px' : '120px 0 40px', minHeight: '100vh', background: 'linear-gradient(135deg,#f0f8ff,#e6f7ff,#d6f0ff)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <div style={{
+        maxWidth: 1300, margin: '0 auto', padding: isMobile ? '0 12px' : '0 40px',
+        display: 'grid',
+        gridTemplateColumns: isMobile ? '1fr' : '340px 1fr',
+        gap: 20,
+        height: isMobile ? 'auto' : '82vh',
+      }}>
 
-          <div style={styles.premiumStatCard}>
-            <div style={styles.glassEffect} />
-            <p style={styles.premiumLabel}>Current Progress</p>
-            <div style={styles.statRow}>
-               <div style={styles.glassScoreCircle}>
-                  <span style={styles.scoreNum}>7.5</span>
-               </div>
-               <div style={styles.statInfo}>
-                  <div style={styles.statValue}><TrendingUp size={14} /> +0.5 Band</div>
-                  <div style={styles.statValue}><Target size={14} /> Goal: 8.5</div>
-               </div>
-            </div>
-          </div>
-
-          <nav style={styles.sideNav}>
-            <p style={styles.sectionLabel}>Learning Tracks</p>
-            {[
-              { n: 'Grammar Precision', i: <Zap size={16}/>, c: BRAND_COLOR },
-              { n: 'Vocabulary Labs', i: <Sparkles size={16}/>, c: '#8b5cf6' },
-              { n: 'Mock Analysis', i: <BarChart3 size={16}/>, c: '#10b981' }
-            ].map((item, idx) => (
-              <div key={idx} style={styles.navItem}>
-                <div style={{...styles.navIcon, color: item.c, backgroundColor: `${item.c}10` }}>{item.i}</div>
-                <span style={styles.navText}>{item.n}</span>
-                <ChevronRight size={14} color="#cbd5e1" />
+        {/* SIDEBAR — hidden on mobile */}
+        {!isMobile && (
+          <aside style={{ background: 'rgba(255,255,255,0.7)', backdropFilter: 'blur(25px)', borderRadius: 40, padding: 35, border: '1px solid #fff', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 40px rgba(0,0,0,0.03)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 15, marginBottom: 35 }}>
+              <div style={{ width: 45, height: 45, background: BRAND_COLOR, borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 16px rgba(59,130,246,0.3)' }}>
+                <BrainCircuit size={22} color="white" />
               </div>
-            ))}
-          </nav>
-        </aside>
-
-        {/* RIGHT: CHAT */}
-        <main style={styles.chatWindow}>
-          <header style={styles.chatHeader}>
-            <div style={styles.aiStatus}>
-              <div style={styles.pulseDot} />
               <div>
-                <h4 style={styles.aiName}>ExamPulse Intelligence</h4>
-                <p style={styles.aiSub}>Online • Analyzing Data</p>
+                <h3 style={{ fontSize: 20, fontWeight: 900, color: '#1a1a1a', margin: 0 }}>ExamPulse AI</h3>
+                <span style={{ fontSize: 11, color: BRAND_COLOR, fontWeight: 800, textTransform: 'uppercase' }}>Neural Mentor</span>
+              </div>
+            </div>
+
+            <div style={{ position: 'relative', overflow: 'hidden', padding: 25, borderRadius: 30, background: 'linear-gradient(135deg,rgba(186,230,253,0.6),rgba(255,255,255,0.4))', border: '1px solid rgba(255,255,255,0.8)', marginBottom: 30 }}>
+              <p style={{ fontSize: 10, fontWeight: 900, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '1.2px', marginBottom: 15 }}>Current Progress</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                <div style={{ width: 70, height: 70, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #fff', boxShadow: '0 10px 20px rgba(0,0,0,0.05)' }}>
+                  <span style={{ fontSize: 24, fontWeight: 900, color: '#1a1a1a' }}>7.5</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: 6 }}><TrendingUp size={14} /> +0.5 Band</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#475569', display: 'flex', alignItems: 'center', gap: 6 }}><Target size={14} /> Goal: 8.5</div>
+                </div>
+              </div>
+            </div>
+
+            <p style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 15 }}>Learning Tracks</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[
+                { n: 'Grammar Precision', i: <Zap size={16}/>, c: BRAND_COLOR },
+                { n: 'Vocabulary Labs', i: <Sparkles size={16}/>, c: '#8b5cf6' },
+                { n: 'Mock Analysis', i: <BarChart3 size={16}/>, c: '#10b981' }
+              ].map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderRadius: 18, background: '#fff', cursor: 'pointer', border: '1px solid #f1f5f9' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', color: item.c, backgroundColor: `${item.c}10` }}>{item.i}</div>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#4b5563' }}>{item.n}</span>
+                  <ChevronRight size={14} color="#cbd5e1" />
+                </div>
+              ))}
+            </div>
+          </aside>
+        )}
+
+        {/* CHAT WINDOW */}
+        <main style={{ background: 'rgba(255,255,255,0.8)', backdropFilter: 'blur(35px)', borderRadius: isMobile ? 24 : 45, border: '1px solid #fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 40px 100px rgba(0,0,0,0.06)', height: isMobile ? '75vh' : 'auto' }}>
+          <header style={{ padding: isMobile ? '16px 20px' : '25px 40px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
+              <div style={{ width: 8, height: 8, background: '#10b981', borderRadius: '50%', boxShadow: '0 0 12px #10b981' }} />
+              <div>
+                <h4 style={{ fontSize: isMobile ? 15 : 17, fontWeight: 800, margin: 0 }}>ExamPulse Intelligence</h4>
+                <p style={{ fontSize: 11, color: BRAND_COLOR, fontWeight: 700, margin: 0 }}>Online • Analyzing Data</p>
               </div>
             </div>
             <ShieldCheck size={20} color={BRAND_COLOR} />
           </header>
 
-          <div style={styles.msgContainer}>
+          <div style={{ flex: 1, padding: isMobile ? '20px 16px' : '40px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
             {conversation.map((msg) => (
-              <div key={msg.id} style={{
-                ...styles.messageRow,
-                justifyContent: msg.type === 'user' ? 'flex-end' : 'flex-start'
-              }}>
+              <div key={msg.id} style={{ display: 'flex', justifyContent: msg.type === 'user' ? 'flex-end' : 'flex-start' }}>
                 <div style={{
-                  ...styles.bubble,
-                  background: msg.type === 'user' ? BRAND_COLOR : 'rgba(255, 255, 255, 0.9)',
-                  color: msg.type === 'user' ? '#ffffff' : '#1a1a1a',
-                  backdropFilter: msg.type === 'ai' ? 'blur(10px)' : 'none',
-                  border: msg.type === 'ai' ? '1px solid rgba(255, 255, 255, 0.5)' : 'none',
+                  maxWidth: isMobile ? '88%' : '72%',
+                  padding: isMobile ? '14px 18px' : '22px 28px',
+                  background: msg.type === 'user' ? BRAND_COLOR : 'rgba(255,255,255,0.9)',
+                  color: msg.type === 'user' ? '#fff' : '#1a1a1a',
                   borderRadius: msg.type === 'user' ? '24px 24px 4px 24px' : '24px 24px 24px 4px',
-                  boxShadow: msg.type === 'ai' ? '0 10px 30px rgba(0,0,0,0.03)' : '0 15px 35px rgba(59,130,246,0.18)'
+                  boxShadow: msg.type === 'ai' ? '0 10px 30px rgba(0,0,0,0.03)' : '0 15px 35px rgba(59,130,246,0.18)',
                 }}>
-                  <div style={styles.textContent}>
+                  <div style={{ fontSize: isMobile ? 13 : 14, lineHeight: 1.7 }}>
                     {msg.text.split('\n').map((line, i) => (
                       <div key={i}>
-                        {line.startsWith('## ') ? <h3 style={styles.h2}>{line.replace('## ', '')}</h3> :
-                         line.startsWith('• ') ? <div style={styles.li}>{line}</div> :
+                        {line.startsWith('## ') ? <h3 style={{ fontSize: 16, fontWeight: 900, color: BRAND_COLOR, marginBottom: 10 }}>{line.replace('## ', '')}</h3> :
+                         line.startsWith('• ') ? <div style={{ marginBottom: 6, paddingLeft: 12, borderLeft: `2px solid ${BRAND_COLOR}` }}>{line}</div> :
                          line}
                       </div>
                     ))}
                   </div>
                   {msg.type === 'ai' && (
-                    <div style={styles.metaInfo}>
-                      <CheckCircle2 size={10} color={BRAND_COLOR} />
-                      Verified AI Mentor
+                    <div style={{ marginTop: 12, paddingTop: 8, borderTop: '1px solid rgba(0,0,0,0.05)', fontSize: 10, fontWeight: 900, color: '#94a3b8', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <CheckCircle2 size={10} color={BRAND_COLOR} /> Verified AI Mentor
                     </div>
                   )}
                 </div>
               </div>
             ))}
-            {isLoading && <div style={styles.loader}>AI is formulating response...</div>}
+            {isLoading && <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 700, fontStyle: 'italic' }}>AI is formulating response...</div>}
             <div ref={messagesEndRef} />
           </div>
 
-          <footer style={styles.footer}>
-            <div style={styles.inputWrapper}>
+          <footer style={{ padding: isMobile ? '12px 16px' : '30px 40px', background: '#fff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#f8fafc', padding: '8px 10px 8px 18px', borderRadius: 24, border: '1px solid #f1f5f9' }}>
               <MessageSquare size={18} color="#94a3b8" />
-              <input 
-                style={styles.input} 
-                placeholder="Ask your IELTS mentor anything..." 
+              <input
+                style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 14, color: '#1a1a1a', fontFamily: 'inherit' }}
+                placeholder="Ask your IELTS mentor anything..."
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
               />
-              <button style={{...styles.sendBtn, background: userInput.trim() ? BRAND_COLOR : '#cbd5e1'}} onClick={handleSendMessage}>
+              <button
+                style={{ width: 46, height: 46, borderRadius: 16, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: userInput.trim() ? BRAND_COLOR : '#cbd5e1', transition: '0.3s', flexShrink: 0 }}
+                onClick={handleSendMessage}
+              >
                 <Send size={18} color="white" />
               </button>
             </div>
           </footer>
         </main>
-
       </div>
     </div>
   );
-};
-
-const styles = {
-  page: { padding: '120px 0 40px 0', minHeight: '100vh', background: 'linear-gradient(135deg, #f0f8ff 0%, #e6f7ff 50%, #d6f0ff 100%)', fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  appContainer: { maxWidth: '1300px', margin: '0 auto', padding: '0 40px', display: 'grid', gridTemplateColumns: '340px 1fr', gap: '30px', height: '82vh' },
-  sidebar: { background: 'rgba(255, 255, 255, 0.7)', backdropFilter: 'blur(25px)', borderRadius: '40px', padding: '35px', border: '1px solid #fff', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 40px rgba(0,0,0,0.03)' },
-  brandBox: { display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '35px' },
-  epIcon: { width: '45px', height: '45px', background: BRAND_COLOR, borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 16px rgba(59, 130, 246, 0.3)' },
-  brandName: { fontSize: '20px', fontWeight: '900', color: '#1a1a1a', margin: 0 },
-  brandTag: { fontSize: '11px', color: BRAND_COLOR, fontWeight: '800', textTransform: 'uppercase' },
-  premiumStatCard: { position: 'relative', overflow: 'hidden', padding: '25px', borderRadius: '30px', background: 'linear-gradient(135deg, rgba(186, 230, 253, 0.6) 0%, rgba(255, 255, 255, 0.4) 100%)', border: '1px solid rgba(255, 255, 255, 0.8)', marginBottom: '30px' },
-  glassEffect: { position: 'absolute', top: '-50%', left: '-50%', width: '200%', height: '200%', background: 'radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 70%)', pointerEvents: 'none' },
-  premiumLabel: { fontSize: '10px', fontWeight: '900', color: '#0369a1', textTransform: 'uppercase', letterSpacing: '1.2px', marginBottom: '15px', position: 'relative', zIndex: 2 },
-  statRow: { display: 'flex', alignItems: 'center', gap: '20px', position: 'relative', zIndex: 2 },
-  glassScoreCircle: { width: '70px', height: '70px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #fff', boxShadow: '0 10px 20px rgba(0,0,0,0.05)' },
-  scoreNum: { fontSize: '24px', fontWeight: '900', color: '#1a1a1a' },
-  statInfo: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  statValue: { fontSize: '12px', fontWeight: '800', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' },
-  sectionLabel: { fontSize: '11px', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '15px' },
-  sideNav: { display: 'flex', flexDirection: 'column', gap: '8px' },
-  navItem: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 15px', borderRadius: '18px', background: '#fff', cursor: 'pointer', border: '1px solid #f1f5f9' },
-  navIcon: { width: '32px', height: '32px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  navText: { flex: 1, fontSize: '13px', fontWeight: '700', color: '#4b5563' },
-  chatWindow: { background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(35px)', borderRadius: '45px', border: '1px solid #fff', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 40px 100px rgba(0,0,0,0.06)' },
-  chatHeader: { padding: '25px 40px', borderBottom: '1px solid rgba(0,0,0,0.04)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  aiStatus: { display: 'flex', alignItems: 'center', gap: '15px' },
-  pulseDot: { width: '8px', height: '8px', background: '#10b981', borderRadius: '50%', boxShadow: '0 0 12px #10b981' },
-  aiName: { fontSize: '17px', fontWeight: '800', margin: 0 },
-  aiSub: { fontSize: '11px', color: BRAND_COLOR, fontWeight: '700' },
-  msgContainer: { flex: 1, padding: '40px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '30px' },
-  messageRow: { display: 'flex' },
-  bubble: { maxWidth: '72%', padding: '22px 28px' },
-  textContent: { fontSize: '14px', lineHeight: '1.7' },
-  h2: { fontSize: '18px', fontWeight: '900', color: BRAND_COLOR, marginBottom: '12px' },
-  li: { marginBottom: '6px', paddingLeft: '12px', borderLeft: `2px solid ${BRAND_COLOR}` },
-  metaInfo: { marginTop: '15px', paddingTop: '10px', borderTop: '1px solid rgba(0,0,0,0.05)', fontSize: '10px', fontWeight: '900', color: '#94a3b8', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '6px' },
-  loader: { fontSize: '12px', color: '#94a3b8', paddingLeft: '40px', fontWeight: '700', fontStyle: 'italic' },
-  footer: { padding: '30px 40px', background: '#fff' },
-  inputWrapper: { display: 'flex', alignItems: 'center', gap: '15px', background: '#f8fafc', padding: '10px 12px 10px 20px', borderRadius: '24px', border: '1px solid #f1f5f9' },
-  input: { flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: '14px', color: '#1a1a1a' },
-  sendBtn: { width: '50px', height: '50px', borderRadius: '18px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.4s' }
 };
 
 export default AITutor;
