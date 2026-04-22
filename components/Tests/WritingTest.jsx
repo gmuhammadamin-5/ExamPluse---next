@@ -14,12 +14,45 @@ import {
   Target, Layers, BookOpen, Brain
 } from 'lucide-react'
 
-// ─── HAQIQIY IELTS SCORING ────────────────────────────────────────────────────
-const analyzeEssay = async (text, taskType, minWords) => {
-  await new Promise(r => setTimeout(r, 1800))
+// ─── AI SCORING via Backend ───────────────────────────────────────────────────
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+const analyzeEssay = async (text, taskType, minWords, prompt = '') => {
+  const wc = text.trim().split(/\s+/).filter(Boolean).length
+
+  // Try backend AI first
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
+    if (token && text.trim().length > 30) {
+      const res = await fetch(`${API_URL}/api/ai/evaluate/writing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ text, prompt, exam_type: 'IELTS' }),
+      })
+      if (res.ok) {
+        const d = await res.json()
+        const cr = d.criteria || {}
+        const fb = [
+          ...(d.strengths || []).map(t => ({ type: 'good', text: t })),
+          ...(d.improvements || []).map(t => ({ type: 'warn', text: t })),
+        ]
+        if (d.feedback) fb.unshift({ type: 'good', text: `AI: ${d.feedback}` })
+        return {
+          ta: cr.task_achievement || 6.0,
+          cc: cr.coherence_cohesion || 6.0,
+          lr: cr.lexical_resource || 6.0,
+          gr: cr.grammatical_range || 6.0,
+          overall: d.band_score || 6.0,
+          fb: fb.length ? fb : [{ type: 'good', text: 'AI evaluation complete.' }],
+          wc,
+        }
+      }
+    }
+  } catch {}
+
+  // Fallback: local scoring
+  await new Promise(r => setTimeout(r, 1200))
   const words = text.trim().split(/\s+/).filter(Boolean)
-  const wc = words.length
   const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 5)
   const avgLen = sentences.length > 0 ? wc / sentences.length : 0
   const unique = new Set(words.map(w => w.toLowerCase().replace(/[^a-z]/g, ''))).size
@@ -299,8 +332,8 @@ const WritingTest = ({ test, onComplete, onExit }) => {
   const handleFinish = async () => {
     setPhase('analyzing')
     const [r0, r1] = await Promise.all([
-      analyzeEssay(answers[0], 1, TASKS[0].minWords),
-      analyzeEssay(answers[1], 2, TASKS[1].minWords),
+      analyzeEssay(answers[0], 1, TASKS[0].minWords, TASKS[0].prompt),
+      analyzeEssay(answers[1], 2, TASKS[1].minWords, TASKS[1].prompt),
     ])
     setResults({ 0: r0, 1: r1 })
     setPhase('result')
