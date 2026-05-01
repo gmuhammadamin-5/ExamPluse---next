@@ -1,6 +1,4 @@
-import dynamic from 'next/dynamic';
-
-const Lessons = dynamic(() => import('@/components/Vd Lessons/Lessons'), { ssr: false });
+import LessonsClient from '@/components/Vd Lessons/LessonsClient';
 
 export const metadata = {
   title: 'Video Lessons — IELTS, TOEFL, SAT',
@@ -9,4 +7,4 @@ export const metadata = {
   alternates: { canonical: 'https://exampulse.uz/lessons' },
 };
 
-export default function LessonsPage() { return <Lessons />; }
+export default function LessonsPage() { return <LessonsClient />; }
