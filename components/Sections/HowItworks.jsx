@@ -23,7 +23,7 @@ export default function HowItWorks() {
   }, []);
 
   return (
-    <section ref={ref} style={{
+    <section ref={ref} className="hiw-section" style={{
       padding: '100px 20px',
       background: '#fff',
       fontFamily: "'Plus Jakarta Sans',system-ui,sans-serif",
@@ -38,8 +38,12 @@ export default function HowItWorks() {
           50%      { transform:translateY(-8px); }
         }
         @media(max-width:900px){
-          .hiw-layout { grid-template-columns:1fr!important; }
-          .hiw-video  { max-width:520px!important; margin:0 auto!important; }
+          .hiw-layout { grid-template-columns:1fr!important; gap:32px!important; }
+          .hiw-video  { max-width:100%!important; margin:0 auto!important; animation:none!important; }
+          .hiw-section { padding:60px 20px!important; }
+        }
+        @media(max-width:480px){
+          .hiw-section { padding:48px 16px!important; }
         }
       `}</style>
 

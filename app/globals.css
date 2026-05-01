@@ -204,3 +204,9 @@ a { color: inherit; text-decoration: none; }
 .page-enter {
   animation: fadeUp .35s cubic-bezier(.4,0,.2,1) both;
 }
+
+/* Dark mode: filter applied to <html> via ThemeContext useEffect */
+/* Re-invert images & canvas so they look natural (double-invert = original) */
+[data-theme="quantum-dark"] img:not([src*=".svg"]) {
+  filter: invert(1) hue-rotate(180deg);
+}

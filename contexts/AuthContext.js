@@ -11,12 +11,11 @@ export const useAuth = () => {
 }
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser]                   = useState(null)
+  const [user, setUser]                       = useState(null)
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
-  const [authMode, setAuthMode]           = useState('login')
-  const [isLoading, setIsLoading]         = useState(true)
+  const [authMode, setAuthMode]               = useState('login')
+  const [isLoading, setIsLoading]             = useState(true)
 
-  // On mount — restore session from localStorage
   useEffect(() => {
     const restore = async () => {
       try {
@@ -26,20 +25,31 @@ export const AuthProvider = ({ children }) => {
           headers: { Authorization: `Bearer ${token}` }
         })
         if (res.ok) {
-          const data = await res.json()
-          setUser(data)
+          setUser(await res.json())
         } else {
           localStorage.removeItem('access_token')
           localStorage.removeItem('refresh_token')
         }
       } catch {
-        // backend offline — keep silent
+        // backend offline
       } finally {
         setIsLoading(false)
       }
     }
     restore()
   }, [])
+
+  const _saveTokensAndFetchMe = async (access_token, refresh_token) => {
+    localStorage.setItem('access_token', access_token)
+    localStorage.setItem('refresh_token', refresh_token)
+    const meRes = await fetch(`${API}/api/auth/me`, {
+      headers: { Authorization: `Bearer ${access_token}` }
+    })
+    const me = await meRes.json()
+    setUser(me)
+    setIsAuthModalOpen(false)
+    return me
+  }
 
   const register = async (email, password, userData) => {
     setIsLoading(true)
@@ -53,17 +63,56 @@ export const AuthProvider = ({ children }) => {
       const data = await res.json()
       if (!res.ok) throw new Error(data.detail || 'Registration failed')
 
-      localStorage.setItem('access_token', data.access_token)
-      localStorage.setItem('refresh_token', data.refresh_token)
+      // Backend returns {status: "verify_email", email} — OTP sent
+      if (data.status === 'verify_email') {
+        return { needsVerification: true, email: data.email }
+      }
 
-      // fetch user profile
-      const meRes = await fetch(`${API}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${data.access_token}` }
+      // Fallback: if tokens returned directly
+      return await _saveTokensAndFetchMe(data.access_token, data.refresh_token)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const verifyEmail = async (email, code) => {
+    setIsLoading(true)
+    try {
+      const res = await fetch(`${API}/api/auth/verify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code })
       })
-      const me = await meRes.json()
-      setUser(me)
-      setIsAuthModalOpen(false)
-      return me
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Invalid or expired code')
+      return await _saveTokensAndFetchMe(data.access_token, data.refresh_token)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const resendOTP = async (email) => {
+    const res = await fetch(`${API}/api/auth/resend-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.detail || 'Failed to resend code')
+    return data
+  }
+
+  const googleLogin = async (credential) => {
+    setIsLoading(true)
+    try {
+      const res = await fetch(`${API}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.detail || 'Google login failed')
+      return await _saveTokensAndFetchMe(data.access_token, data.refresh_token)
     } finally {
       setIsLoading(false)
     }
@@ -78,18 +127,13 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify({ email, password })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || 'Invalid email or password')
-
-      localStorage.setItem('access_token', data.access_token)
-      localStorage.setItem('refresh_token', data.refresh_token)
-
-      const meRes = await fetch(`${API}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${data.access_token}` }
-      })
-      const me = await meRes.json()
-      setUser(me)
-      setIsAuthModalOpen(false)
-      return me
+      if (!res.ok) {
+        if (data.detail === 'verify_email_required') {
+          return { needsVerification: true, email }
+        }
+        throw new Error(data.detail || 'Invalid email or password')
+      }
+      return await _saveTokensAndFetchMe(data.access_token, data.refresh_token)
     } finally {
       setIsLoading(false)
     }
@@ -135,6 +179,9 @@ export const AuthProvider = ({ children }) => {
     register,
     login,
     logout,
+    verifyEmail,
+    resendOTP,
+    googleLogin,
     resetPassword,
     deleteAccount,
     updateUserProfile,
@@ -143,7 +190,8 @@ export const AuthProvider = ({ children }) => {
     closeAuthModal,
     isAuthenticated: !!user,
     userProgress: user?.progress || {},
-    testHistory: user?.testHistory || []
+    testHistory: user?.testHistory || [],
+    setAuthMode,
   }
 
   return (

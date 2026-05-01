@@ -1,37 +1,39 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useLayoutEffect } from 'react'
 
-const ThemeContext = createContext({ dark: false, toggle: () => {} })
+const ThemeContext = createContext()
 
 export function ThemeProvider({ children }) {
-  const [dark, setDark] = useState(false)
-  const [mounted, setMounted] = useState(false)
+  const [theme, setTheme] = useState('quantum-light')
 
-  useEffect(() => {
-    setMounted(true)
+  // useLayoutEffect = paint'dan OLDIN ishlaydi → flash yo'q
+  // [theme] dependency: toggle bosilganda ham, mount'da ham ishlaydi
+  useLayoutEffect(() => {
+    const isDark = theme === 'quantum-dark'
+    const html = document.documentElement
+    html.style.filter = isDark ? 'invert(1) hue-rotate(180deg)' : ''
+    html.setAttribute('data-theme', theme)
+  }, [theme])
+
+  // Saqlangan temanio yuklash — bu ham useLayoutEffect, paint'dan oldin
+  useLayoutEffect(() => {
     try {
       const saved = localStorage.getItem('ep-theme')
-      if (saved === 'dark') {
-        setDark(true)
-        document.documentElement.setAttribute('data-theme', 'dark')
+      if (saved === 'quantum-dark' || saved === 'dark') {
+        setTheme('quantum-dark')
       }
     } catch {}
   }, [])
 
-  const toggle = () => {
-    const nd = !dark
-    setDark(nd)
-    try {
-      localStorage.setItem('ep-theme', nd ? 'dark' : 'light')
-      document.documentElement.setAttribute('data-theme', nd ? 'dark' : 'light')
-    } catch {}
+  const toggleTheme = () => {
+    const next = theme === 'quantum-dark' ? 'quantum-light' : 'quantum-dark'
+    setTheme(next)
+    try { localStorage.setItem('ep-theme', next) } catch {}
   }
 
-  if (!mounted) return <>{children}</>
-
   return (
-    <ThemeContext.Provider value={{ dark, toggle }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, isDark: theme === 'quantum-dark' }}>
       {children}
     </ThemeContext.Provider>
   )

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Users, Award, DollarSign, FileText, Activity, TrendingUp, TrendingDown } from 'lucide-react';
 import { Card, CardHead, SparkLine } from '../components/helpers';
 
@@ -87,11 +87,29 @@ const TEXT = {
   },
 };
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 export default function Overview({ lang = 'uz' }) {
   const [period, setPeriod] = useState('monthly');
+  const [live, setLive] = useState(null);
   const tx = TEXT[lang];
   const stats    = STAT_CARDS[lang];
   const activity = ACTIVITY[lang];
+
+  useEffect(() => {
+    const token = sessionStorage.getItem('ep_admin_token');
+    if (!token) return;
+    fetch(`${API_URL}/api/dashboard/admin/overview`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(r => r.ok ? r.json() : null).then(d => { if (d) setLive(d); }).catch(() => {});
+  }, []);
+
+  const liveVal = (idx, fallback) => {
+    if (!live) return fallback;
+    const keys = ['total_users', null, null, 'total_tests', 'active_users', 'avg_score'];
+    const k = keys[idx];
+    return k ? String(live[k]) : fallback;
+  };
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
@@ -110,7 +128,7 @@ export default function Overview({ lang = 'uz' }) {
                   <span style={{ fontSize:10, fontWeight:700, color:s.up?'#16a34a':'#dc2626' }}>{s.diff}</span>
                 </div>
               </div>
-              <div style={{ fontSize:24, fontWeight:900, color:'#0f172a', marginBottom:2 }}>{s.val}</div>
+              <div style={{ fontSize:24, fontWeight:900, color:'#0f172a', marginBottom:2 }}>{liveVal(i, s.val)}</div>
               <div style={{ fontSize:11, color:'#94a3b8', marginBottom:10 }}>{s.label}</div>
               <SparkLine data={s.data} color={s.color} />
             </div>

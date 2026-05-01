@@ -94,7 +94,7 @@ export default function Features() {
 
   return (
     <section ref={ref} style={{
-      padding: '100px 20px',
+      padding: 'clamp(60px,8vw,100px) 20px',
       background: 'linear-gradient(135deg, #f0f8ff 0%, #e6f7ff 50%, #d6f0ff 100%)',
       fontFamily: "'Plus Jakarta Sans',system-ui,sans-serif",
     }}>
@@ -119,14 +119,14 @@ export default function Features() {
         </div>
 
         {/* grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+        <div className="feat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {FEATURES.map((f, i) => (
             <FeatureCard key={f.title} {...f} delay={i * 60} />
           ))}
         </div>
 
         {/* bottom stats */}
-        <div style={{
+        <div className="feat-stats" style={{
           marginTop: 56,
           background: 'linear-gradient(135deg,#2563eb,#7c3aed)',
           borderRadius: 24,
@@ -156,6 +156,8 @@ export default function Features() {
         @media(max-width:1024px){ .feat-grid{grid-template-columns:repeat(3,1fr)!important} }
         @media(max-width:700px) { .feat-grid{grid-template-columns:repeat(2,1fr)!important} }
         @media(max-width:440px) { .feat-grid{grid-template-columns:1fr!important} }
+        @media(max-width:700px) { .feat-stats{grid-template-columns:repeat(2,1fr)!important; padding:24px 20px!important; gap:16px!important} }
+        @media(max-width:440px) { .feat-stats{grid-template-columns:repeat(2,1fr)!important} }
       `}</style>
     </section>
   );

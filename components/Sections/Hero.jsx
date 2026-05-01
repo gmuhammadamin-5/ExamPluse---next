@@ -47,7 +47,7 @@ function sampleShape(count, drawFn) {
   return pos
 }
 
-function MorphingParticles({ section, activeService, mouseRef }) {
+function MorphingParticles({ section, activeService, mouseRef, isMobile }) {
   const { scene } = useThree()
   const count = 13000
 
@@ -138,7 +138,7 @@ function MorphingParticles({ section, activeService, mouseRef }) {
   }, [])
 
   const mat = useRef(new THREE.PointsMaterial({
-    color: new THREE.Color('#1e3a8a'),
+    color: new THREE.Color('#007bff'),
     size: 0.052, sizeAttenuation: true,
     transparent: true, opacity: 0.92, depthWrite: false,
   }))
@@ -156,6 +156,13 @@ function MorphingParticles({ section, activeService, mouseRef }) {
     return () => scene.remove(mesh.current)
   }, [scene])
 
+  useEffect(() => {
+    // Fewer particles on mobile for performance
+    geo.current.setDrawRange(0, isMobile ? 7000 : 13000)
+    // Slightly smaller sphere on mobile
+    mesh.current.scale.setScalar(isMobile ? 0.72 : 1.0)
+  }, [isMobile])
+
   const lifeOffsets = useMemo(() => {
     const a = new Float32Array(count)
     for (let i = 0; i < count; i++) a[i] = Math.random() * Math.PI * 2
@@ -165,8 +172,10 @@ function MorphingParticles({ section, activeService, mouseRef }) {
   const tgtColor = useRef(new THREE.Color('#1e3a8a'))
   const secRef = useRef(section)
   const svcRef = useRef(activeService)
+  const mobileRef = useRef(isMobile)
 
   useEffect(() => { secRef.current = section }, [section])
+  useEffect(() => { mobileRef.current = isMobile }, [isMobile])
   useEffect(() => {
     svcRef.current = activeService
     tgtColor.current.set(SVC_COLOR[activeService] || '#1e3a8a')
@@ -194,7 +203,7 @@ function MorphingParticles({ section, activeService, mouseRef }) {
       else if (svc === 'Writing') target = shapes.writing
     }
 
-    const tx = sec === 'hero' ? 0 : -3.2
+    const tx = (sec === 'hero' || mobileRef.current) ? 0 : -3.2
     m.position.x = THREE.MathUtils.lerp(m.position.x, tx, 0.045)
 
     const mx = mouseRef?.current?.x ?? 0
@@ -207,7 +216,8 @@ function MorphingParticles({ section, activeService, mouseRef }) {
       m.rotation.x = THREE.MathUtils.lerp(m.rotation.x, 0, 0.02)
     }
 
-    for (let i = 0; i < count; i++) {
+    const limit = mobileRef.current ? 7000 : count
+    for (let i = 0; i < limit; i++) {
       const i3 = i * 3, off = lifeOffsets[i]
       const lv = Math.sin(t*.4+off)*.025 + Math.sin(t*1.2+off*1.7)*.012 + Math.sin(t*3.5+off*2.3)*.006
       arr[i3]   += (target[i3]   + lv - arr[i3])   * 0.065
@@ -226,7 +236,15 @@ export default function Hero() {
   const [activeService, setActiveService] = useState('Speaking')
   const [scrollProg, setScrollProg] = useState(0)
   const [mounted, setMounted] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const mouseRef = useRef({ x: 0, y: 0 })
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   useEffect(() => { setTimeout(() => setMounted(true), 80) }, [])
 
@@ -264,16 +282,20 @@ export default function Hero() {
     <>
       <style>{`
         @media (max-width: 768px) {
-          .ep-left { display: none !important; }
-          .ep-grid { grid-template-columns: 1fr !important; padding: 0 16px !important; }
-          .ep-h1   { font-size: 2.2rem !important; letter-spacing: -2px !important; }
-          .ep-btns { flex-direction: column !important; }
-          .ep-btn  { justify-content: center !important; }
+          .ep-left  { display: none !important; }
+          .ep-grid  { grid-template-columns: 1fr !important; padding: 0 16px !important; }
+          .ep-h1    { font-size: 2rem !important; letter-spacing: -1.5px !important; }
+          .ep-btns  { flex-direction: column !important; }
+          .ep-btn   { justify-content: center !important; width: 100% !important; }
+          .ep-stats { gap: 8px !important; }
+          .ep-stat  { min-width: 80px !important; padding: 10px 14px !important; }
+          .ep-hero-content { padding: 0 20px !important; }
+          .ep-svc-wrap { padding: 24px 0 !important; }
         }
       `}</style>
 
-      {/* Scroll progress */}
-      <div style={{ position:'fixed', left:22, top:'50%', transform:'translateY(-50%)', zIndex:100, display:'flex', flexDirection:'column', alignItems:'center', gap:8, pointerEvents:'none' }}>
+      {/* Scroll progress — hidden on mobile */}
+      <div style={{ position:'fixed', left:22, top:'50%', transform:'translateY(-50%)', zIndex:100, display: isMobile ? 'none' : 'flex', flexDirection:'column', alignItems:'center', gap:8, pointerEvents:'none' }}>
         <div style={{ width:2, height:110, background:'rgba(59,130,246,0.15)', borderRadius:2, position:'relative', overflow:'hidden' }}>
           <div style={{ position:'absolute', top:0, left:0, right:0, height:`${scrollProg*100}%`, background:'linear-gradient(180deg,#0ea5e9,#3b82f6)', borderRadius:2, transition:'height .08s linear' }}/>
         </div>
@@ -285,8 +307,8 @@ export default function Hero() {
       <div style={{ position:'relative' }}>
         {/* Sticky canvas */}
         <div style={{ position:'sticky', top:0, height:'100vh', width:'100%', zIndex:0, overflow:'hidden' }}>
-          <Canvas camera={{ position:[0,0,8.5], fov:50 }} dpr={[1,1.5]} gl={{ alpha:true }} style={{ background:'transparent' }}>
-            <MorphingParticles section={section} activeService={activeService} mouseRef={mouseRef}/>
+          <Canvas camera={{ position:[0,0,8.5], fov:50 }} dpr={isMobile ? [1,1] : [1,1.5]} gl={{ alpha:true }} style={{ background:'transparent' }}>
+            <MorphingParticles section={section} activeService={activeService} mouseRef={mouseRef} isMobile={isMobile}/>
           </Canvas>
         </div>
 
@@ -301,7 +323,7 @@ export default function Hero() {
             pointerEvents: section==='hero' ? 'auto' : 'none',
             padding:'0 20px',
           }}>
-            <div style={{ textAlign:'center', maxWidth:820, width:'100%' }}>
+            <div className="ep-hero-content" style={{ textAlign:'center', maxWidth:820, width:'100%' }}>
 
               <motion.div initial={{ opacity:0, y:-20 }} animate={mounted?{opacity:1,y:0}:{}} transition={{ duration:.5 }}
                 style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(255,255,255,0.88)', backdropFilter:'blur(14px)', padding:'9px 20px', borderRadius:100, fontSize:12, fontWeight:800, color:'#3b82f6', marginBottom:24, border:'1px solid rgba(59,130,246,0.16)' }}>
@@ -332,9 +354,9 @@ export default function Hero() {
                 </button>
               </motion.div>
 
-              <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap', marginTop:36, opacity:mounted?1:0, transform:mounted?'translateY(0)':'translateY(20px)', transition:'all 0.7s ease 0.5s' }}>
+              <div className="ep-stats" style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap', marginTop:36, opacity:mounted?1:0, transform:mounted?'translateY(0)':'translateY(20px)', transition:'all 0.7s ease 0.5s' }}>
                 {STATS.map((s,i) => (
-                  <motion.div key={s.label} initial={{ opacity:0, y:20, scale:.9 }} animate={mounted?{opacity:1,y:0,scale:1}:{}} transition={{ delay:.55+i*.07, duration:.45 }}
+                  <motion.div key={s.label} className="ep-stat" initial={{ opacity:0, y:20, scale:.9 }} animate={mounted?{opacity:1,y:0,scale:1}:{}} transition={{ delay:.55+i*.07, duration:.45 }}
                     style={{ background:'rgba(255,255,255,0.78)', backdropFilter:'blur(18px)', border:'1px solid rgba(255,255,255,0.96)', borderRadius:14, padding:'12px 20px', textAlign:'center', boxShadow:'0 4px 22px rgba(0,0,0,0.06)', minWidth:95 }}>
                     <div style={{ fontSize:20, fontWeight:900, color:s.color, lineHeight:1 }}>{s.value}</div>
                     <div style={{ fontSize:9, fontWeight:700, color:'#94a3b8', marginTop:4, textTransform:'uppercase', letterSpacing:'0.8px' }}>{s.label}</div>
@@ -359,7 +381,7 @@ export default function Hero() {
             <div className="ep-grid" style={{ maxWidth:1400, margin:'0 auto', width:'100%', display:'grid', gridTemplateColumns:'1fr 1fr', gap:40, padding:'0 50px' }}>
               <div className="ep-left"/>
 
-              <div style={{ display:'flex', flexDirection:'column', justifyContent:'center', padding:'60px 0' }}>
+              <div className="ep-svc-wrap" style={{ display:'flex', flexDirection:'column', justifyContent:'center', padding:'60px 0' }}>
                 <motion.div initial={{ opacity:0, x:30 }} animate={section==='services'?{opacity:1,x:0}:{}} transition={{ duration:.55 }}>
                   <div style={{ fontSize:11, fontWeight:800, color:'#3b82f6', textTransform:'uppercase', letterSpacing:2, marginBottom:10 }}>What We Offer</div>
                   <h2 style={{ fontSize:'clamp(1.7rem,4vw,2.8rem)', fontWeight:900, color:'#0f172a', marginBottom:10, lineHeight:1.1, letterSpacing:'-1.5px' }}>

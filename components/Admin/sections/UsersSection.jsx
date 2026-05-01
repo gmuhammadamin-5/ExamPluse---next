@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Plus, Eye, Ban, UserCheck, ChevronUp, ChevronDown, X, Check } from 'lucide-react';
 import { Avatar, Badge, Plan, Card, CardHead, Tbl, TRow, ActionBtn, Input, Select, Btn } from '../components/helpers';
 import { Pagination, usePagination } from '../components/Pagination';
@@ -20,6 +20,26 @@ const INIT_USERS = [
   { id:12,name:'Gulnora Karimova',    email:'guln@mail.com', plan:'FREE', score:5.8, tests:2,  joined:'2024-05-01', last:'5 kun oldin',   status:'inactive',avatar:'GK', paid:0,      country:'🇰🇬' },
 ];
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const adminFetch = (path, opts = {}) => fetch(API_URL + path, {
+  ...opts,
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionStorage.getItem('ep_admin_token')}`, ...(opts.headers || {}) },
+});
+const mapUser = u => ({
+  id: u.id,
+  name: u.full_name,
+  email: u.email,
+  plan: u.is_admin ? 'ADMIN' : 'FREE',
+  score: u.avg_score || 0,
+  tests: u.test_count || 0,
+  joined: u.created_at ? u.created_at.split('T')[0] : '—',
+  last: '—',
+  status: u.is_active ? 'active' : 'banned',
+  avatar: u.full_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(),
+  paid: 0,
+  country: '🇺🇿',
+});
+
 const RESULTS_BY_USER = {
   1: [{ test:'Academic Mock 1', exam:'IELTS', score:'7.0', date:'2024-05-01', L:'7.5',R:'7.0',W:'6.5',S:'7.0', passed:true }],
   2: [{ test:'Academic Mock 2', exam:'IELTS', score:'8.0', date:'2024-05-02', L:'8.5',R:'8.0',W:'7.5',S:'8.0', passed:true }],
@@ -28,6 +48,13 @@ const RESULTS_BY_USER = {
 
 export default function UsersSection({ toast }) {
   const [users, setUsers]       = useState(INIT_USERS);
+
+  useEffect(() => {
+    adminFetch('/api/dashboard/admin/users')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setUsers(data.map(mapUser)); })
+      .catch(() => {});
+  }, []);
   const [q, setQ]               = useState('');
   const [planFilter, setPlan]   = useState('all');
   const [statusFilter, setStatus] = useState('all');
@@ -73,6 +100,7 @@ export default function UsersSection({ toast }) {
         : `${u.name} ni bannlaysizmi? U tizimga kira olmaydi.`,
       danger: u.status !== 'banned',
       onConfirm: () => {
+        adminFetch(`/api/dashboard/admin/users/${u.id}/active`, { method: 'PUT' }).catch(() => {});
         setUsers(prev => prev.map(x => x.id === u.id
           ? { ...x, status: x.status === 'banned' ? 'active' : 'banned' }
           : x

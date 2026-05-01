@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { X, Sparkles, PenTool, Mic2, GraduationCap, ChevronRight, LayoutDashboard, User, LogOut, Send, Zap, Menu } from 'lucide-react';
+import { X, Sparkles, PenTool, Mic2, GraduationCap, ChevronRight, LayoutDashboard, User, LogOut, Send, Zap, Menu, Moon, Sun } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const Header = () => {
   const [isSidebarOpen, setIsSidebarOpen]   = useState(false);
@@ -14,6 +15,8 @@ const Header = () => {
   const pathname = usePathname();
   const router   = useRouter();
   const { user, isAuthenticated, openAuthModal, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === 'quantum-dark';
 
   const hideHeaderRoutes = ['/test/', '/exam/', '/take-test', '/practice', '/mock'];
   const isTestPage = hideHeaderRoutes.some(route => pathname?.startsWith(route));
@@ -115,6 +118,15 @@ const Header = () => {
 
           {/* Right actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Dark/Light toggle — #f1f5f9 inverts to dark in dark mode automatically */}
+            <button
+              onClick={toggleTheme}
+              title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: 38, height: 38, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+            >
+              {isDark ? <Sun size={17} color="#f59e0b" /> : <Moon size={17} color="#64748b" />}
+            </button>
+
             {/* AI Tutors button — desktop only */}
             {!isMobile && (
               <button

@@ -34,7 +34,19 @@ const BentoFeatures = () => {
   }, []);
 
   return (
-    <section style={styles.section}>
+    <section className="bento-section" style={styles.section}>
+      <style>{`
+        @media(max-width:900px){
+          .bento-section { padding: clamp(60px,8vw,100px) 0 !important; }
+          .bento-grid { grid-template-columns: 1fr !important; }
+          .bento-large { grid-column: span 1 !important; grid-row: span 1 !important; }
+          .bento-wide  { grid-column: span 1 !important; flex-direction: column !important; }
+          .bento-wide .bento-chart-icon { width: 80px !important; height: 80px !important; }
+        }
+        @media(max-width:480px){
+          .bento-section .container { padding: 0 16px !important; }
+        }
+      `}</style>
       <div className="container" style={styles.container}>
         
         {/* HEADER AREA */}
@@ -51,7 +63,7 @@ const BentoFeatures = () => {
         <div className="bento-grid" style={styles.grid}>
           
           {/* LARGE CARD: SPEAKING AI */}
-          <div className="bento-item" style={{...styles.card, gridColumn: 'span 2', gridRow: 'span 2'}}>
+          <div className="bento-item bento-large" style={{...styles.card, gridColumn: 'span 2', gridRow: 'span 2'}}>
             <div style={styles.iconBox}><Mic2 size={30} color="#3b82f6" /></div>
             <h3 style={styles.cardTitle}>Neural Speaking Engine</h3>
             <p style={styles.cardDesc}>Experience the world's most advanced AI interview simulation. Get real-time feedback on your pronunciation, intonation, and grammatical range with 99.4% precision.</p>
@@ -78,12 +90,12 @@ const BentoFeatures = () => {
           </div>
 
           {/* WIDE CARD: ANALYTICS (WHERE BarChart3 LIVES) */}
-          <div className="bento-item" style={{...styles.card, gridColumn: 'span 2', flexDirection: 'row', alignItems: 'center', gap: '30px'}}>
+          <div className="bento-item bento-wide" style={{...styles.card, gridColumn: 'span 2', flexDirection: 'row', alignItems: 'center', gap: '30px'}}>
             <div style={{flex: 1}}>
               <h3 style={styles.cardTitle}>Predictive Analytics</h3>
               <p style={styles.cardDesc}>Track your progress with granular data. Identify scoring plateaus and receive AI-generated pathways to improvement.</p>
             </div>
-            <div style={styles.chartIconBox}>
+            <div className="bento-chart-icon" style={styles.chartIconBox}>
                <BarChart3 size={48} color="#3b82f6" strokeWidth={1.5} />
             </div>
           </div>

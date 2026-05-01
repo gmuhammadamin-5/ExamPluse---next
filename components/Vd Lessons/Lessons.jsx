@@ -79,13 +79,20 @@ export default function Lessons() {
   const [open, setOpen]       = useState(null)
   const [playing, setPlaying] = useState(null)
   const [search, setSearch]   = useState('')
-  const [watched, setWatched] = useState({1:true,2:true})
+  const [watched, setWatched] = useState(() => {
+    try { const s = localStorage.getItem('ep-lessons-watched'); return s ? JSON.parse(s) : {1:true,2:true}; }
+    catch { return {1:true,2:true}; }
+  })
 
   const course  = COURSES[exam]
   const allL    = course.sections.flatMap(s=>s.lessons)
   const wCount  = allL.filter(l=>watched[l.id]||l.watched).length
   const pct     = Math.round(wCount/allL.length*100)
-  const markW   = id => setWatched(p=>({...p,[id]:true}))
+  const markW   = id => setWatched(p => {
+    const next = {...p,[id]:true}
+    try { localStorage.setItem('ep-lessons-watched', JSON.stringify(next)) } catch {}
+    return next
+  })
 
   const filtered = search
     ? course.sections.map(s=>({...s,lessons:s.lessons.filter(l=>l.title.toLowerCase().includes(search.toLowerCase()))})).filter(s=>s.lessons.length>0)
@@ -111,6 +118,16 @@ export default function Lessons() {
         .ls-modal{animation:slideUp .28s cubic-bezier(.34,1.4,.64,1)}
         ::-webkit-scrollbar{width:5px}
         ::-webkit-scrollbar-thumb{background:rgba(37,99,235,0.2);border-radius:5px}
+        @media(max-width:768px){
+          .ls-hdr{flex-direction:column!important;gap:20px!important;padding:20px 18px!important}
+          .ls-hdr-center{order:-1}
+          .ls-tabs-row{gap:6px!important}
+          .ls-search-wrap{margin-left:0!important;width:100%}
+          .ls-search-inp{width:100%!important}
+        }
+        @media(max-width:480px){
+          .ls-modal{width:100%!important;border-radius:18px!important}
+        }
       `}</style>
 
       <div className="ls" style={{
@@ -128,7 +145,7 @@ export default function Lessons() {
         <div style={{maxWidth:1100,margin:'0 auto',position:'relative',zIndex:1}}>
 
           {/* ═══ TOP PROGRESS BAR (center) ═══ */}
-          <div style={{
+          <div className="ls-hdr" style={{
             background:'rgba(255,255,255,0.65)',
             backdropFilter:'blur(20px)',
             WebkitBackdropFilter:'blur(20px)',
@@ -156,7 +173,7 @@ export default function Lessons() {
             </div>
 
             {/* Center — big progress */}
-            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:12,flex:1}}>
+            <div className="ls-hdr-center" style={{display:'flex',flexDirection:'column',alignItems:'center',gap:12,flex:1}}>
               {/* SVG circle */}
               <div style={{position:'relative',width:100,height:100}}>
                 <svg width="100" height="100" viewBox="0 0 100 100">
@@ -206,7 +223,7 @@ export default function Lessons() {
           </div>
 
           {/* ═══ TABS + SEARCH ═══ */}
-          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:28,flexWrap:'wrap'}}>
+          <div className="ls-tabs-row" style={{display:'flex',alignItems:'center',gap:10,marginBottom:28,flexWrap:'wrap'}}>
             {['IELTS','TOEFL','SAT'].map(k=>(
               <button key={k} className="ls-tab"
                 onClick={()=>{setExam(k);setOpen(null);setPlaying(null)}}
@@ -222,9 +239,9 @@ export default function Lessons() {
                 {k}
               </button>
             ))}
-            <div style={{marginLeft:'auto',position:'relative'}}>
+            <div className="ls-search-wrap" style={{marginLeft:'auto',position:'relative'}}>
               <Search size={13} color="#94a3b8" style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)'}}/>
-              <input className="ls-inp" value={search} onChange={e=>setSearch(e.target.value)}
+              <input className="ls-inp ls-search-inp" value={search} onChange={e=>setSearch(e.target.value)}
                 placeholder="Search lessons..."
                 style={{padding:'11px 14px 11px 34px',border:'1px solid rgba(255,255,255,0.90)',borderRadius:14,fontSize:13,background:'rgba(255,255,255,0.70)',backdropFilter:'blur(12px)',width:220,color:'#0f172a',transition:'all .2s'}}/>
             </div>

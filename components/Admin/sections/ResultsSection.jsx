@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Download, ChevronUp, ChevronDown, Eye, X } from 'lucide-react';
 import { Card, CardHead, Badge, Avatar, Stars, Tbl, TRow, ActionBtn, downloadCSV } from '../components/helpers';
 import { Pagination, usePagination } from '../components/Pagination';
@@ -24,6 +24,24 @@ const INIT_RESULTS = [
   { id:14, user:'Ulugbek Rakhimov',   avatar:'UR', exam:'Cambridge',  type:'Full Mock',  score:60,   band:'B1', date:'2024-12-04', duration:'2h 30m', sections:{L:14,R:16,W:15,S:15},   passed:false },
   { id:15, user:'Shakhnoza Kenja',    avatar:'SK', exam:'TOEFL',     type:'Full Mock',  score:95,   band:'B2', date:'2024-12-03', duration:'3h 00m', sections:{L:24,R:25,W:23,S:23},   passed:true  },
 ];
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const adminFetch = path => fetch(API_URL + path, {
+  headers: { Authorization: `Bearer ${sessionStorage.getItem('ep_admin_token')}` },
+});
+const mapResult = r => ({
+  id: r.id,
+  user: r.user,
+  avatar: r.user.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase(),
+  exam: r.exam || 'IELTS',
+  type: r.section || 'Practice',
+  score: r.score,
+  band: r.band || null,
+  date: r.date ? r.date.split('T')[0] : '—',
+  duration: r.duration || '—',
+  sections: {},
+  passed: r.score >= 6,
+});
 
 const EXAM_COLORS = { IELTS:'#2563eb', Cambridge:'#7c3aed', TOEFL:'#0891b2', CEFR:'#059669', SAT:'#ea580c' };
 const SECTION_LABELS = { L:'Listening', R:'Reading', W:'Writing', S:'Speaking' };
@@ -102,6 +120,7 @@ function DetailModal({ result, onClose }) {
 }
 
 export default function ResultsSection({ toast }) {
+  const [results, setResults] = useState(INIT_RESULTS);
   const [search, setSearch]   = useState('');
   const [exam, setExam]       = useState('Barchasi');
   const [type, setType]       = useState('Barchasi');
@@ -111,8 +130,15 @@ export default function ResultsSection({ toast }) {
   const [sortDir, setSortDir] = useState('desc');
   const [detail, setDetail]   = useState(null);
 
+  useEffect(() => {
+    adminFetch('/api/dashboard/admin/results')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data && data.length) setResults(data.map(mapResult)); })
+      .catch(() => {});
+  }, []);
+
   const filtered = useMemo(() => {
-    let d = [...INIT_RESULTS];
+    let d = [...results];
     if (search)          d = d.filter(r => r.user.toLowerCase().includes(search.toLowerCase()));
     if (exam !== 'Barchasi') d = d.filter(r => r.exam === exam);
     if (type !== 'Barchasi') d = d.filter(r => r.type === type);

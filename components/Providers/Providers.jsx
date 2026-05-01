@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-// Contextlarni to'g'ri manzildan import qilamiz
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { AIProvider } from '@/contexts/AIContext';
 import { GamificationProvider } from '@/contexts/GamificationContext';
@@ -13,20 +13,22 @@ import { UserProvider } from '@/contexts/UserContext';
 
 export default function Providers({ children }) {
   return (
-    <AuthProvider>
-      <AIProvider>
-        <GamificationProvider>
-          <ProgressProvider>
-            <CollaborationProvider>
-              <TestProvider>
-                <UserProvider>
-                  {children}
-                </UserProvider>
-              </TestProvider>
-            </CollaborationProvider>
-          </ProgressProvider>
-        </GamificationProvider>
-      </AIProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AIProvider>
+          <GamificationProvider>
+            <ProgressProvider>
+              <CollaborationProvider>
+                <TestProvider>
+                  <UserProvider>
+                    {children}
+                  </UserProvider>
+                </TestProvider>
+              </CollaborationProvider>
+            </ProgressProvider>
+          </GamificationProvider>
+        </AIProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

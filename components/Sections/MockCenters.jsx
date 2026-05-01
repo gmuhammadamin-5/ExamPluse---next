@@ -34,13 +34,13 @@ const MockCenters = () => {
   const bluePulse = createPulseIcon(neonBlue);
 
   return (
-    <section style={styles.section}>
+    <section className="mock-centers-section" style={styles.section}>
       <div style={styles.container}>
-        <div style={styles.layout}>
+        <div className="mock-layout" style={styles.layout}>
           
           {/* --- CHAP TARAF: DARK DOT MAP (YANGILANDI) --- */}
           <div style={styles.mapSide}>
-            <div style={styles.mapWrapper}>
+            <div className="mock-map-wrapper" style={styles.mapWrapper}>
               
               <div style={styles.mapContainerStyle}>
                 <MapContainer 
@@ -93,7 +93,7 @@ const MockCenters = () => {
           </div>
 
           {/* --- O'NG TARAF: YOZUVLARGA TEGILMADI --- */}
-          <div style={styles.contentSide}>
+          <div className="mock-content" style={styles.contentSide}>
             <h2 style={styles.title}>
               take a cdi mock test in our <br /> 
               <span style={{color: '#3b82f6'}}>darhon elite center</span>
@@ -124,7 +124,17 @@ const MockCenters = () => {
 
       {/* CSS Animatsiyalar (Marker va Popup uchun) */}
       <style>{`
-        /* Marker Stili */
+        @media(max-width:900px){
+          .mock-layout { grid-template-columns:1fr !important; gap:40px !important; }
+          .mock-centers-section { padding:clamp(60px,8vw,100px) 0 !important; }
+          .mock-centers-section > div { padding:0 20px !important; }
+          .mock-map-wrapper { height:320px !important; }
+          .mock-content { padding-left:0 !important; }
+        }
+        @media(max-width:480px){
+          .mock-centers-section { padding:52px 0 !important; }
+          .mock-map-wrapper { height:260px !important; }
+        }
         .pulse-marker {
           width: 24px; height: 24px; border-radius: 50%;
           position: relative; z-index: 10; display: flex; align-items: center; justify-content: center;
@@ -140,8 +150,6 @@ const MockCenters = () => {
           0% { width: 24px; height: 24px; opacity: 0.8; border-width: 3px; }
           100% { width: 100px; height: 100px; opacity: 0; border-width: 1px; }
         }
-
-        /* Popup Stili */
         .tech-popup .leaflet-popup-content-wrapper {
           background: rgba(2, 6, 23, 0.9); backdrop-filter: blur(10px);
           border: 1px solid #3b82f6; color: white; border-radius: 4px;

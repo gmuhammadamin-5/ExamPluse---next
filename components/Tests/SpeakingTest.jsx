@@ -62,32 +62,72 @@ const loadProgress = () => {
 }
 const clearProgress = () => { try { localStorage.removeItem(STORAGE_KEY) } catch {} }
 
-// ─── Scoring ──────────────────────────────────────────────────────────────────
-const analyzeRecordings = async (recordings) => {
-  await new Promise(r => setTimeout(r, 2200))
+// ─── AI Scoring via backend ────────────────────────────────────────────────────
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
+const analyzeRecordings = async (recordings, fullTranscript = '') => {
   const allRecs = Object.values(recordings).flat()
   const avg   = allRecs.reduce((s, r) => s + r.duration, 0) / Math.max(1, allRecs.length)
+
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
+
+  // Try AI scoring if we have a meaningful transcript
+  if (token && fullTranscript.split(' ').length >= 10) {
+    try {
+      const res = await fetch(`${API_URL}/api/ai/evaluate/speaking`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ transcript: fullTranscript, exam_type: 'IELTS', task_type: 'all_parts' }),
+      })
+      if (res.ok) {
+        const d = await res.json()
+        const cr = d.criteria || {}
+        const fc = parseFloat((cr.fluency_coherence || 6.0).toFixed(1))
+        const lr = parseFloat((cr.lexical_resource  || 6.0).toFixed(1))
+        const gr = parseFloat((cr.grammatical_range || 6.0).toFixed(1))
+        const pr = parseFloat((cr.pronunciation     || 6.0).toFixed(1))
+        const overall = d.band_score || parseFloat((Math.round(((fc+lr+gr+pr)/4)*2)/2).toFixed(1))
+
+        // Save to backend
+        fetch(`${API_URL}/api/results`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ section: 'speaking', exam_type: 'IELTS', band_score: overall, ai_scores: cr, ai_feedback: d.feedback || '' }),
+        }).catch(() => {})
+
+        const feedback = [
+          ...(d.strengths    || []).map(t => `✅ ${t}`),
+          ...(d.improvements || []).map(t => `⚠️ ${t}`),
+        ]
+        if (d.feedback) feedback.push(`💡 ${d.feedback}`)
+        if (!feedback.length) feedback.push('💡 Complete all 3 parts for detailed AI feedback.')
+        return { fc, lr, gr, pr, overall, feedback }
+      }
+    } catch {}
+  }
+
+  // Fallback: local scoring by duration
+  await new Promise(r => setTimeout(r, 1800))
   const parts = Object.keys(recordings).length
   let fc = avg >= 60 ? 7.5 : avg >= 40 ? 6.5 : avg >= 20 ? 5.5 : 4.5
   if (parts === 3) fc = Math.min(9, fc + 0.5)
-  let lr = Math.min(9, (recordings[3] ? 7.0 : 6.0) + Math.random() * 0.6)
+  let lr = Math.min(9, (recordings[3] ? 7.0 : 6.0) + Math.random() * 0.4)
   let gr = Math.min(9, (avg >= 50 ? 7.0 : avg >= 30 ? 6.0 : 5.5) + (recordings[2] ? 0.5 : 0))
-  let pr = Math.min(9, 5.5 + Math.random() * 2.0)
+  let pr = Math.min(9, 5.5 + Math.random() * 1.5)
   fc = parseFloat(fc.toFixed(1)); lr = parseFloat(lr.toFixed(1))
   gr = parseFloat(gr.toFixed(1)); pr = parseFloat(pr.toFixed(1))
   const overall = Math.round(((fc + lr + gr + pr) / 4) * 2) / 2
+  const noTranscript = !fullTranscript
   const feedback = [
+    noTranscript
+      ? `ℹ️ No transcript captured — score estimated from recording duration. Use Chrome for AI scoring.`
+      : `ℹ️ Log in for full AI evaluation.`,
     avg < 30
-      ? `⚠️ Responses averaged ${Math.round(avg)}s — too short. Longer answers boost Fluency & Coherence significantly.`
-      : `✅ Good response length (avg ${Math.round(avg)}s). Sustained speech demonstrates fluency clearly.`,
-    !recordings[2]
-      ? `⚠️ Part 2 not completed. Speaking 1–2 minutes continuously is a key Band 7+ indicator.`
-      : `✅ Part 2 completed. Long-turn speech is one of the strongest fluency signals in IELTS.`,
-    !recordings[3]
-      ? `⚠️ Part 3 not completed. Abstract thinking and complex language is assessed here.`
-      : `✅ Part 3 completed. Use "On the other hand" and "It could be argued" to boost Coherence.`,
-    `💡 Pronunciation: record yourself reading aloud 10 min/day. Focus on word stress and intonation.`,
-    `💡 Grammar: use conditionals, relative clauses and passive voice to signal a higher band.`,
+      ? `⚠️ Responses averaged ${Math.round(avg)}s — too short. Longer answers boost Fluency.`
+      : `✅ Good response length (avg ${Math.round(avg)}s).`,
+    !recordings[2] ? `⚠️ Part 2 not completed.` : `✅ Part 2 completed.`,
+    !recordings[3] ? `⚠️ Part 3 not completed.` : `✅ Part 3 completed.`,
+    `💡 Use conditionals, relative clauses and passive voice to signal a higher band.`,
   ]
   return { fc, lr, gr, pr, overall, feedback }
 }
@@ -404,10 +444,12 @@ const SpeakingTest = ({ test, onComplete, onExit }) => {
   const [micStream,   setMicStream]   = useState(null)    // for live waveform
   const [isMobile,    setIsMobile]    = useState(false)
 
-  const mediaRecorder = useRef(null)
-  const audioChunks   = useRef([])
-  const streamRef     = useRef(null)
-  const timerRef      = useRef(null)
+  const mediaRecorder       = useRef(null)
+  const audioChunks         = useRef([])
+  const streamRef           = useRef(null)
+  const timerRef            = useRef(null)
+  const lastBlobRef         = useRef(null)   // audio blob for Whisper upload
+  const transcriptQueue     = useRef([])     // Promise[] — one per recording
 
   const part   = PARTS[currentPart]
   const question = part.questions[currentQ]
@@ -459,7 +501,8 @@ const SpeakingTest = ({ test, onComplete, onExit }) => {
       audioChunks.current = []
       mediaRecorder.current.ondataavailable = e => audioChunks.current.push(e.data)
       mediaRecorder.current.onstop = () => {
-        const blob = new Blob(audioChunks.current, { type:'audio/wav' })
+        const blob = new Blob(audioChunks.current, { type: 'audio/webm' })
+        lastBlobRef.current = blob
         setAudioUrl(URL.createObjectURL(blob))
         setMicStream(null)
       }
@@ -521,6 +564,26 @@ const SpeakingTest = ({ test, onComplete, onExit }) => {
 
   const handleSend = () => {
     const dur = recordStart ? (Date.now()-recordStart)/1000 : 0
+
+    // Fire Whisper transcription in background — works in ALL browsers
+    const blob = lastBlobRef.current
+    lastBlobRef.current = null
+    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
+    if (blob && token) {
+      const p = (async () => {
+        try {
+          const fd = new FormData()
+          fd.append('file', blob, 'recording.webm')
+          const res = await fetch(`${API_URL}/api/ai/transcribe`, {
+            method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
+          })
+          if (res.ok) { const d = await res.json(); return d.transcript || '' }
+        } catch {}
+        return ''
+      })()
+      transcriptQueue.current.push(p)
+    }
+
     const upd = { ...recordings, [currentPart]: [...(recordings[currentPart]||[]), { duration:dur }] }
     setRecordings(upd)
     setAudioUrl(null); setRecordStart(null)
@@ -541,7 +604,16 @@ const SpeakingTest = ({ test, onComplete, onExit }) => {
     clearProgress()
     window.speechSynthesis?.cancel(); clearTimer()
     setPhase('analyzing')
-    const res = await analyzeRecordings(recs)
+
+    // Wait for all Whisper transcriptions to finish
+    let fullTranscript = ''
+    if (transcriptQueue.current.length > 0) {
+      const parts = await Promise.all(transcriptQueue.current)
+      fullTranscript = parts.filter(Boolean).join(' ').trim()
+      transcriptQueue.current = []
+    }
+
+    const res = await analyzeRecordings(recs, fullTranscript)
     setResults(res); setPhase('result')
   }
 

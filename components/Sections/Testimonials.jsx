@@ -56,7 +56,17 @@ const Testimonials = () => {
   ];
 
   return (
-    <section style={styles.section}>
+    <section className="testimonials-section" style={styles.section}>
+      <style>{`
+        @media(max-width:768px){
+          .testimonials-section { padding: clamp(60px,8vw,100px) 0 !important; }
+          .testimonials-section .swiper-slide { width: min(340px, 90vw) !important; }
+        }
+        @media(max-width:480px){
+          .testimonials-section { padding: 52px 0 !important; }
+          .testimonials-section .swiper-slide { width: 92vw !important; }
+        }
+      `}</style>
       <div className="container" style={styles.container}>
         
         {/* HEADER */}
