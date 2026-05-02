@@ -4,7 +4,7 @@ import { X, Mail, Lock, User, Eye, EyeOff, ArrowLeft, RefreshCw } from 'lucide-r
 import { useAuth } from '@/contexts/AuthContext';
 
 const BRAND = '#007bff';
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '904259294183-c4i69ncv8oqjqs7udfd88oj8eq8p7fnj.apps.googleusercontent.com';
 
 export default function AuthModal() {
   const {
