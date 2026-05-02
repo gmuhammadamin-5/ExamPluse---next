@@ -276,7 +276,7 @@ export default function ExamHub() {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  const isPro = user?.plan === 'pro' || user?.is_premium || false;
+  const isPro = user?.plan === 'pro' || user?.is_premium || user?.is_admin || false;
   const freeUsed = user ? getTestsUsed(user.id || user.email) : 0;
   const userId = user?.id || user?.email;
 

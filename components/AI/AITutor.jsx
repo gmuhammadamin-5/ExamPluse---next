@@ -58,7 +58,7 @@ function ProWall({ isAuthenticated, openAuthModal }) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 const AITutor = () => {
   const { user, isAuthenticated, openAuthModal } = useAuth();
-  const isPro = user?.plan === 'pro' || user?.is_premium || false;
+  const isPro = user?.plan === 'pro' || user?.is_premium || user?.is_admin || false;
 
   const [conversation, setConversation] = useState([
     {
