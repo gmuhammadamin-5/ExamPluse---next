@@ -8,6 +8,7 @@ import Loading from '@/components/Layout/Loading';
 import AuthModal from '@/components/Auth/AuthModal';
 
 const NO_SHELL = ['/admin'];
+const NO_FOOTER = ['/ai-tutor'];
 
 export default function ClientShell({ children }) {
   const [loading, setLoading] = useState(true);
@@ -23,11 +24,13 @@ export default function ClientShell({ children }) {
   const isAdmin = NO_SHELL.some(p => pathname?.startsWith(p));
   if (isAdmin) return <>{children}</>;
 
+  const hideFooter = NO_FOOTER.some(p => pathname?.startsWith(p));
+
   return (
     <div className="App">
       <Header />
       <main>{children}</main>
-      <Footer />
+      {!hideFooter && <Footer />}
       <AuthModal />
     </div>
   );
