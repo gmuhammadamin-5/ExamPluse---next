@@ -85,13 +85,11 @@ export default function LessonsSection({ toast }) {
         body: JSON.stringify({ filename: file.name }),
       });
       if (!urlRes.ok) throw new Error('Signed URL olishda xatolik');
-      const { signed_url, public_url, token } = await urlRes.json();
+      const { signed_url, public_url } = await urlRes.json();
 
       // 2. Upload file directly to Supabase using XHR (for progress)
       await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        // Supabase signed URL upload format
-        const uploadUrl = `${signed_url}${token ? `?token=${token}` : ''}`;
         xhr.open('PUT', signed_url);
         xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
         xhr.upload.onprogress = e => {
