@@ -44,6 +44,8 @@ export default function AuthModal() {
             setError(err.message || 'Google login failed');
           }
         },
+        auto_select: false,
+        cancel_on_tap_outside: false,
       });
       window.google.accounts.id.renderButton(googleBtnRef.current, {
         theme: 'outline', size: 'large', width: 348, text: 'continue_with',
