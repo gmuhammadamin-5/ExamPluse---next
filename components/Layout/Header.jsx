@@ -83,9 +83,9 @@ const Header = () => {
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000,
         transition: 'all 0.4s',
         padding: scrolled ? '10px 0' : '18px 0',
-        backgroundColor: scrolled ? 'rgba(255,255,255,0.92)' : 'transparent',
-        backdropFilter: scrolled ? 'blur(25px) saturate(180%)' : 'none',
-        borderBottom: scrolled ? '1px solid rgba(0,0,0,0.06)' : 'none',
+        backgroundColor: scrolled || isMobile ? 'rgba(255,255,255,0.95)' : 'transparent',
+        backdropFilter: scrolled || isMobile ? 'blur(25px) saturate(180%)' : 'none',
+        borderBottom: scrolled || isMobile ? '1px solid rgba(0,0,0,0.06)' : 'none',
       }}>
         <div style={{ maxWidth: 1440, width: '100%', margin: '0 auto', padding: '0 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
 
@@ -167,7 +167,10 @@ const Header = () => {
               )
             )}
 
-            {/* Hamburger — mobile only */}
+            {/* Mobile: Login/Register + Hamburger */}
+            {isMobile && !isAuthenticated && (
+              <button onClick={() => openAuthModal('register')} style={{ background: brandColor, color: '#fff', border: 'none', padding: '8px 14px', borderRadius: 10, fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Register</button>
+            )}
             {isMobile && (
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
