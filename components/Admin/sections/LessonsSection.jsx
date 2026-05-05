@@ -1,259 +1,318 @@
 "use client";
-import React, { useState, useMemo } from 'react';
-import { Search, Plus, Trash2, Edit2, Youtube, Eye, EyeOff, ChevronDown, ChevronUp, X, Check } from 'lucide-react';
-import { Card, CardHead, Tbl, TRow, ActionBtn, Badge } from '../components/helpers';
-import { ConfirmModal } from '../components/ConfirmModal';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Plus, X, Edit3, Trash2, Check, RefreshCw, AlertCircle, Upload, Eye, EyeOff, Play, Film } from 'lucide-react';
+import { Card, CardHead, Tbl, TRow, ActionBtn, Input, Select, Btn } from '../components/helpers';
 import { Pagination, usePagination } from '../components/Pagination';
+import { ConfirmModal } from '../components/ConfirmModal';
 
-const CATS = ['Barchasi','IELTS','Cambridge','TOEFL','CEFR','SAT','Umumiy'];
-const CAT_COLORS = { IELTS:'#2563eb', Cambridge:'#7c3aed', TOEFL:'#0891b2', CEFR:'#059669', SAT:'#ea580c', Umumiy:'#64748b' };
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const CATS = ['IELTS', 'CAMBRIDGE', 'TOEFL', 'CEFR', 'SAT', 'Umumiy'];
+const CAT_COLORS = { IELTS:'#2563eb', CAMBRIDGE:'#7c3aed', TOEFL:'#0891b2', CEFR:'#059669', SAT:'#ea580c', Umumiy:'#64748b' };
 
-let _id = 100;
-const INIT_LESSONS = [
-  { id:1,  title:"IELTS Writing Task 2 - Essay yozish",     cat:'IELTS',     ytId:'dQw4w9WgXcQ', views:4820, duration:'18:32', visible:true,  order:1  },
-  { id:2,  title:"IELTS Speaking - Fluency va Coherence",   cat:'IELTS',     ytId:'dQw4w9WgXcQ', views:3610, duration:'22:15', visible:true,  order:2  },
-  { id:3,  title:"IELTS Listening - Multiple Choice",       cat:'IELTS',     ytId:'dQw4w9WgXcQ', views:2940, duration:'15:48', visible:true,  order:3  },
-  { id:4,  title:"Cambridge C1 Reading - Gapped Text",      cat:'Cambridge', ytId:'dQw4w9WgXcQ', views:2100, duration:'20:00', visible:true,  order:1  },
-  { id:5,  title:"Cambridge B2 Use of English",             cat:'Cambridge', ytId:'dQw4w9WgXcQ', views:1850, duration:'25:10', visible:true,  order:2  },
-  { id:6,  title:"TOEFL Integrated Writing",                cat:'TOEFL',     ytId:'dQw4w9WgXcQ', views:1620, duration:'16:40', visible:true,  order:1  },
-  { id:7,  title:"TOEFL Speaking - Independent Task",       cat:'TOEFL',     ytId:'dQw4w9WgXcQ', views:1440, duration:'12:55', visible:false, order:2  },
-  { id:8,  title:"CEFR B1 Grammar - Past Perfect",          cat:'CEFR',      ytId:'dQw4w9WgXcQ', views:980,  duration:'14:20', visible:true,  order:1  },
-  { id:9,  title:"SAT Math - Algebra Asoslari",             cat:'SAT',       ytId:'dQw4w9WgXcQ', views:2200, duration:'28:00', visible:true,  order:1  },
-  { id:10, title:"SAT Evidence-Based Reading",              cat:'SAT',       ytId:'dQw4w9WgXcQ', views:1950, duration:'23:30', visible:true,  order:2  },
-  { id:11, title:"Akademik so'z boyligini oshirish",        cat:'Umumiy',    ytId:'dQw4w9WgXcQ', views:3300, duration:'19:45', visible:true,  order:1  },
-  { id:12, title:"IELTS Reading - True/False/Not Given",    cat:'IELTS',     ytId:'dQw4w9WgXcQ', views:2680, duration:'17:15', visible:false, order:4  },
-];
+const BLANK = { title: '', category: 'IELTS', description: '', duration: '', order: '0', is_visible: true };
 
-const EMPTY_FORM = { title:'', cat:'IELTS', ytId:'', duration:'', order:'', visible:true };
+function adminToken() { return sessionStorage.getItem('ep_admin_token') || ''; }
 
-function YtThumb({ ytId, size=50 }) {
-  return (
-    <div style={{ position:'relative', width:size*1.78, height:size, borderRadius:10, overflow:'hidden', flexShrink:0, background:'#0f172a' }}>
-      <img src={`https://img.youtube.com/vi/${ytId}/mqdefault.jpg`} alt=""
-        style={{ width:'100%', height:'100%', objectFit:'cover', opacity:.85 }}
-        onError={e=>{ e.target.style.display='none'; }}/>
-      <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
-        <div style={{ width:20, height:20, borderRadius:'50%', background:'rgba(255,0,0,0.85)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <div style={{ width:0, height:0, borderTop:'5px solid transparent', borderBottom:'5px solid transparent', borderLeft:'8px solid #fff', marginLeft:2 }}/>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LessonForm({ initial, onSave, onCancel, title }) {
-  const [form, setForm] = useState(initial);
-  const set = (k,v) => setForm(f => ({ ...f, [k]:v }));
-
-  const inputStyle = { width:'100%', padding:'9px 12px', border:'1.5px solid #f1f5f9', borderRadius:10, fontSize:13, outline:'none', boxSizing:'border-box', background:'#f8fafc', fontFamily:'inherit' };
-  const labelStyle = { fontSize:11, fontWeight:700, color:'#64748b', marginBottom:4, display:'block' };
-
-  return (
-    <div style={{ background:'#f8fafc', border:'1.5px solid #f1f5f9', borderRadius:16, padding:20, marginBottom:14 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-        <span style={{ fontSize:14, fontWeight:800, color:'#0f172a' }}>{title}</span>
-        <button onClick={onCancel} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', display:'flex' }}><X size={16}/></button>
-      </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:12 }}>
-        <div style={{ gridColumn:'span 2' }}>
-          <label style={labelStyle}>Dars nomi</label>
-          <input value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Masalan: IELTS Writing Task 2..." style={inputStyle}/>
-        </div>
-        <div>
-          <label style={labelStyle}>Kategoriya</label>
-          <select value={form.cat} onChange={e=>set('cat',e.target.value)}
-            style={{ ...inputStyle, cursor:'pointer' }}>
-            {CATS.slice(1).map(c=><option key={c}>{c}</option>)}
-          </select>
-        </div>
-        <div>
-          <label style={labelStyle}>YouTube Video ID</label>
-          <input value={form.ytId} onChange={e=>set('ytId',e.target.value)} placeholder="dQw4w9WgXcQ" style={inputStyle}/>
-        </div>
-        <div>
-          <label style={labelStyle}>Davomiyligi</label>
-          <input value={form.duration} onChange={e=>set('duration',e.target.value)} placeholder="18:32" style={inputStyle}/>
-        </div>
-        <div>
-          <label style={labelStyle}>Tartib raqami</label>
-          <input type="number" value={form.order} onChange={e=>set('order',e.target.value)} placeholder="1" style={inputStyle}/>
-        </div>
-      </div>
-      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
-        <button onClick={()=>set('visible',!form.visible)}
-          style={{ width:40, height:22, borderRadius:11, background:form.visible?'#2563eb':'#e2e8f0', border:'none', cursor:'pointer', position:'relative', transition:'background .2s', flexShrink:0 }}>
-          <div style={{ width:18, height:18, borderRadius:'50%', background:'#fff', position:'absolute', top:2, left:form.visible?20:2, transition:'left .2s', boxShadow:'0 1px 4px rgba(0,0,0,0.2)' }}/>
-        </button>
-        <span style={{ fontSize:12, fontWeight:600, color:'#64748b' }}>{form.visible ? 'Ko\'rinadigan' : 'Yashirin'}</span>
-      </div>
-      <div style={{ display:'flex', gap:8 }}>
-        <button onClick={()=>onSave(form)}
-          style={{ display:'flex', alignItems:'center', gap:6, padding:'9px 18px', background:'linear-gradient(135deg,#2563eb,#1d4ed8)', border:'none', borderRadius:10, color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-          <Check size={14}/>Saqlash
-        </button>
-        <button onClick={onCancel}
-          style={{ padding:'9px 16px', border:'1.5px solid #e2e8f0', borderRadius:10, background:'#fff', fontSize:13, fontWeight:600, color:'#64748b', cursor:'pointer', fontFamily:'inherit' }}>
-          Bekor
-        </button>
-      </div>
-    </div>
-  );
+function formatBytes(bytes) {
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  return (bytes / 1024 / 1024 / 1024).toFixed(2) + ' GB';
 }
 
 export default function LessonsSection({ toast }) {
-  const [lessons, setLessons]   = useState(INIT_LESSONS);
-  const [search, setSearch]     = useState('');
-  const [cat, setCat]           = useState('Barchasi');
-  const [showAdd, setShowAdd]   = useState(false);
-  const [editId, setEditId]     = useState(null);
-  const [deleteTarget, setDel]  = useState(null);
-  const [sortKey, setSortKey]   = useState('order');
-  const [sortDir, setSortDir]   = useState('asc');
+  const [lessons,    setLessons]   = useState([]);
+  const [loading,    setLoading]   = useState(true);
+  const [error,      setError]     = useState('');
+  const [catFilter,  setCatFilter] = useState('all');
+  const [showForm,   setShowForm]  = useState(false);
+  const [editLesson, setEditLesson]= useState(null);
+  const [form,       setForm]      = useState(BLANK);
+  const [videoFile,  setVideoFile] = useState(null);
+  const [uploading,  setUploading] = useState(false);
+  const [uploadPct,  setUploadPct] = useState(0);
+  const [confirm,    setConfirm]   = useState(null);
+  const [preview,    setPreview]   = useState(null);
+  const fileRef = useRef(null);
 
-  const filtered = useMemo(() => {
-    let d = [...lessons];
-    if (search)          d = d.filter(l => l.title.toLowerCase().includes(search.toLowerCase()));
-    if (cat !== 'Barchasi') d = d.filter(l => l.cat === cat);
-    d.sort((a,b) => {
-      let av = a[sortKey], bv = b[sortKey];
-      if (typeof av === 'string') return sortDir==='asc' ? av.localeCompare(bv) : bv.localeCompare(av);
-      return sortDir==='asc' ? av-bv : bv-av;
+  /* ── fetch ──────────────────────────────────────────────── */
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const res = await fetch(`${API_URL}/api/admin/lessons`, {
+        headers: { Authorization: `Bearer ${adminToken()}` },
+      });
+      if (!res.ok) throw new Error(res.status);
+      setLessons(await res.json());
+    } catch (e) { setError('Yuklab bo\'lmadi: ' + e.message); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  /* ── filter + paginate ──────────────────────────────────── */
+  const filtered = catFilter === 'all' ? lessons : lessons.filter(l => l.category === catFilter);
+  const { page, setPage, total, sliced, reset } = usePagination(filtered, 10);
+
+  /* ── form helpers ───────────────────────────────────────── */
+  const openAdd = () => { setForm(BLANK); setVideoFile(null); setEditLesson(null); setShowForm(true); };
+  const openEdit = (l) => {
+    setForm({ title: l.title, category: l.category, description: l.description || '', duration: l.duration || '', order: String(l.order), is_visible: l.is_visible });
+    setVideoFile(null);
+    setEditLesson(l);
+    setShowForm(true);
+  };
+  const closeForm = () => { setShowForm(false); setEditLesson(null); setVideoFile(null); setUploadPct(0); };
+  const f = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
+  const fCheck = k => e => setForm(p => ({ ...p, [k]: e.target.checked }));
+
+  /* ── upload with XHR (progress tracking) ───────────────── */
+  const saveLesson = () => {
+    if (!form.title.trim()) { toast('Dars nomini kiriting', 'error'); return; }
+    if (!editLesson && !videoFile) { toast('Video fayl tanlang', 'error'); return; }
+
+    setUploading(true);
+    setUploadPct(0);
+
+    const data = new FormData();
+    data.append('title',       form.title);
+    data.append('category',    form.category);
+    data.append('description', form.description);
+    data.append('duration',    form.duration);
+    data.append('order',       form.order || '0');
+    data.append('is_visible',  form.is_visible ? 'true' : 'false');
+    if (videoFile) data.append('video', videoFile);
+
+    const url    = editLesson ? `${API_URL}/api/admin/lessons/${editLesson.id}` : `${API_URL}/api/admin/lessons`;
+    const method = editLesson ? 'PUT' : 'POST';
+
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, url);
+    xhr.setRequestHeader('Authorization', `Bearer ${adminToken()}`);
+
+    xhr.upload.onprogress = e => {
+      if (e.lengthComputable) setUploadPct(Math.round(e.loaded / e.total * 100));
+    };
+
+    xhr.onload = async () => {
+      setUploading(false);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        toast(editLesson ? 'Dars yangilandi ✓' : 'Dars qo\'shildi ✓', 'success');
+        closeForm();
+        load();
+      } else {
+        try { const d = JSON.parse(xhr.responseText); toast('Xatolik: ' + (d.detail || xhr.status), 'error'); }
+        catch { toast('Xatolik: ' + xhr.status, 'error'); }
+      }
+    };
+    xhr.onerror = () => { setUploading(false); toast('Tarmoq xatoligi', 'error'); };
+    xhr.send(data);
+  };
+
+  /* ── delete ─────────────────────────────────────────────── */
+  const deleteLesson = (l) => {
+    setConfirm({
+      title: 'Darsni o\'chirish',
+      message: `"${l.title}" darsini o'chirasizmi? Video ham o'chib ketadi.`,
+      danger: true,
+      onConfirm: async () => {
+        setConfirm(null);
+        try {
+          const res = await fetch(`${API_URL}/api/admin/lessons/${l.id}`, {
+            method: 'DELETE', headers: { Authorization: `Bearer ${adminToken()}` },
+          });
+          if (!res.ok) throw new Error(res.status);
+          toast('Dars o\'chirildi', 'success');
+          load();
+        } catch (e) { toast('O\'chirishda xatolik: ' + e.message, 'error'); }
+      },
     });
-    return d;
-  }, [lessons, search, cat, sortKey, sortDir]);
-
-  const { page, setPage, total, sliced, reset } = usePagination(filtered, 8);
-
-  const toggleSort = key => {
-    if (sortKey === key) setSortDir(d => d==='asc'?'desc':'asc');
-    else { setSortKey(key); setSortDir('asc'); }
-    reset();
-  };
-  const SortIcon = ({ k }) => sortKey===k
-    ? (sortDir==='asc' ? <ChevronUp size={13}/> : <ChevronDown size={13}/>)
-    : <ChevronDown size={13} style={{ opacity:.3 }}/>;
-
-  const handleAdd = (form) => {
-    if (!form.title.trim() || !form.ytId.trim()) { toast("Nomi va YouTube ID kiritilishi shart", 'error'); return; }
-    setLessons(ls => [...ls, { ...form, id:++_id, views:0, order:Number(form.order)||ls.length+1 }]);
-    setShowAdd(false);
-    toast('Dars qo\'shildi ✓');
   };
 
-  const handleEdit = (form) => {
-    if (!form.title.trim() || !form.ytId.trim()) { toast("Nomi va YouTube ID kiritilishi shart", 'error'); return; }
-    setLessons(ls => ls.map(l => l.id===editId ? { ...l, ...form, order:Number(form.order)||l.order } : l));
-    setEditId(null);
-    toast('Dars yangilandi ✓');
+  /* ── toggle visibility ──────────────────────────────────── */
+  const toggleVisible = async (l) => {
+    const data = new FormData();
+    data.append('title',       l.title);
+    data.append('category',    l.category);
+    data.append('description', l.description || '');
+    data.append('duration',    l.duration || '');
+    data.append('order',       String(l.order));
+    data.append('is_visible',  (!l.is_visible).toString());
+    try {
+      await fetch(`${API_URL}/api/admin/lessons/${l.id}`, {
+        method: 'PUT', headers: { Authorization: `Bearer ${adminToken()}` }, body: data,
+      });
+      load();
+    } catch { toast('Xatolik', 'error'); }
   };
-
-  const handleDelete = () => {
-    setLessons(ls => ls.filter(l => l.id !== deleteTarget.id));
-    setDel(null);
-    toast('Dars o\'chirildi');
-  };
-
-  const toggleVisible = (id) => {
-    setLessons(ls => ls.map(l => l.id===id ? { ...l, visible:!l.visible } : l));
-    const lesson = lessons.find(l=>l.id===id);
-    toast(lesson?.visible ? 'Dars yashirildi' : 'Dars ko\'rsatildi');
-  };
-
-  const editLesson = lessons.find(l=>l.id===editId);
 
   return (
-    <div style={{ display:'flex',flexDirection:'column',gap:14 }}>
-      {/* stats row */}
-      <div style={{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12 }}>
-        {[
-          { label:'Jami darslar',   val:lessons.length,                          color:'#2563eb' },
-          { label:'Ko\'rinadigan',  val:lessons.filter(l=>l.visible).length,     color:'#059669' },
-          { label:'Yashirin',       val:lessons.filter(l=>!l.visible).length,    color:'#f59e0b' },
-          { label:'Jami ko\'rishlar', val:lessons.reduce((s,l)=>s+l.views,0).toLocaleString(), color:'#7c3aed' },
-        ].map(s => (
-          <Card key={s.label}>
-            <div style={{ padding:'14px 18px' }}>
-              <div style={{ fontSize:11,color:'#94a3b8',fontWeight:600,marginBottom:4 }}>{s.label}</div>
-              <div style={{ fontSize:24,fontWeight:900,color:s.color }}>{s.val}</div>
-            </div>
-          </Card>
-        ))}
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      <Card>
-        {/* toolbar */}
-        <div style={{ padding:'14px 18px',borderBottom:'1.5px solid #f8fafc',display:'flex',gap:10,flexWrap:'wrap',alignItems:'center' }}>
-          <div style={{ position:'relative',flex:1,minWidth:180 }}>
-            <Search size={13} color="#94a3b8" style={{ position:'absolute',left:11,top:'50%',transform:'translateY(-50%)' }}/>
-            <input value={search} onChange={e=>{setSearch(e.target.value);reset();}}
-              placeholder="Dars qidirish..."
-              style={{ width:'100%',padding:'8px 12px 8px 32px',border:'1.5px solid #f1f5f9',borderRadius:10,fontSize:13,outline:'none',boxSizing:'border-box',background:'#f8fafc' }}/>
+      {/* Video preview modal */}
+      {preview && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setPreview(null)}>
+          <div style={{ position: 'relative', width: '90%', maxWidth: 900 }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => setPreview(null)}
+              style={{ position: 'absolute', top: -40, right: 0, background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 14 }}>
+              <X size={22} color="#fff" /> Yopish
+            </button>
+            <video src={preview} controls autoPlay style={{ width: '100%', borderRadius: 14, maxHeight: '80vh' }} />
           </div>
-          <select value={cat} onChange={e=>{setCat(e.target.value);reset();}}
-            style={{ padding:'8px 12px',border:'1.5px solid #f1f5f9',borderRadius:10,fontSize:13,outline:'none',background:'#f8fafc',cursor:'pointer' }}>
-            {CATS.map(c=><option key={c}>{c}</option>)}
-          </select>
-          <button onClick={()=>{setShowAdd(true);setEditId(null);}}
-            style={{ display:'flex',alignItems:'center',gap:6,padding:'8px 16px',background:'linear-gradient(135deg,#2563eb,#1d4ed8)',border:'none',borderRadius:10,color:'#fff',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit' }}>
-            <Plus size={14}/>Dars qo'shish
-          </button>
         </div>
+      )}
 
-        <div style={{ padding:'14px 18px 0' }}>
-          {showAdd && <LessonForm initial={EMPTY_FORM} onSave={handleAdd} onCancel={()=>setShowAdd(false)} title="Yangi dars qo'shish"/>}
-          {editLesson && <LessonForm key={editId} initial={editLesson} onSave={handleEdit} onCancel={()=>setEditId(null)} title="Darsni tahrirlash"/>}
-        </div>
+      {/* add / edit form */}
+      {showForm && (
+        <Card>
+          <CardHead
+            title={editLesson ? 'Darsni tahrirlash' : 'Yangi dars qo\'shish'}
+            action={
+              <button onClick={closeForm} style={{ width: 30, height: 30, borderRadius: 8, background: '#fee2e2', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <X size={13} color="#dc2626" />
+              </button>
+            }
+          />
+          <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
 
-        <Tbl headers={[
-          { label:'Video' },
-          { label:'Nomi', sortKey:'title', onClick:()=>toggleSort('title'), Icon:()=><SortIcon k="title"/> },
-          { label:'Kategoriya', sortKey:'cat', onClick:()=>toggleSort('cat'), Icon:()=><SortIcon k="cat"/> },
-          { label:'Davomiylik' },
-          { label:"Ko'rishlar", sortKey:'views', onClick:()=>toggleSort('views'), Icon:()=><SortIcon k="views"/> },
-          { label:'Tartib', sortKey:'order', onClick:()=>toggleSort('order'), Icon:()=><SortIcon k="order"/> },
-          { label:'Holat' },
-          { label:'Amallar', width:90 },
-        ]}>
-          {sliced.map(l => (
-            <TRow key={l.id}>
-              <td style={{ padding:'10px 16px' }}><YtThumb ytId={l.ytId}/></td>
-              <td style={{ padding:'10px 16px',maxWidth:240 }}>
-                <div style={{ fontSize:13,fontWeight:700,color:'#0f172a',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis' }}>{l.title}</div>
-              </td>
-              <td style={{ padding:'10px 16px' }}>
-                <span style={{ fontSize:11,fontWeight:700,color:CAT_COLORS[l.cat]||'#64748b',background:`${CAT_COLORS[l.cat]||'#64748b'}18`,borderRadius:7,padding:'3px 9px' }}>{l.cat}</span>
-              </td>
-              <td style={{ padding:'10px 16px',fontSize:12,color:'#64748b' }}>{l.duration}</td>
-              <td style={{ padding:'10px 16px',fontSize:13,fontWeight:700,color:'#0f172a' }}>{l.views.toLocaleString()}</td>
-              <td style={{ padding:'10px 16px',fontSize:13,fontWeight:700,color:'#64748b',textAlign:'center' }}>{l.order}</td>
-              <td style={{ padding:'10px 16px' }}>
-                <span style={{ fontSize:11,fontWeight:700,color:l.visible?'#059669':'#94a3b8',background:l.visible?'#dcfce7':'#f1f5f9',borderRadius:7,padding:'3px 9px' }}>
-                  {l.visible ? "Ko'rinadigan" : 'Yashirin'}
-                </span>
-              </td>
-              <td style={{ padding:'10px 16px' }}>
-                <div style={{ display:'flex',gap:6 }}>
-                  <ActionBtn icon={l.visible?EyeOff:Eye} color={l.visible?'#94a3b8':'#059669'} title={l.visible?'Yashirish':'Ko\'rsatish'} onClick={()=>toggleVisible(l.id)}/>
-                  <ActionBtn icon={Edit2} color="#2563eb" title="Tahrirlash" onClick={()=>{setEditId(l.id);setShowAdd(false);}}/>
-                  <ActionBtn icon={Trash2} color="#dc2626" title="O'chirish" onClick={()=>setDel(l)}/>
+            {/* title */}
+            <div style={{ gridColumn: '1/-1' }}>
+              <Input label="Dars nomi *" value={form.title} onChange={f('title')} placeholder="IELTS Writing Task 2 - Essay yozish" />
+            </div>
+
+            <Select label="Kategoriya" value={form.category} onChange={f('category')} options={CATS} />
+            <Input label="Davomiyligi" value={form.duration} onChange={f('duration')} placeholder="18:32" />
+            <Input label="Tartib raqami" value={form.order} onChange={f('order')} type="number" placeholder="1" />
+
+            <div style={{ gridColumn: '1/-1' }}>
+              <Input label="Tavsif (ixtiyoriy)" value={form.description} onChange={f('description')} placeholder="Bu darsda nima o'rganasiz..." />
+            </div>
+
+            {/* video file picker */}
+            <div style={{ gridColumn: '1/-1' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 8 }}>
+                Video fayl {editLesson ? '(yangilash uchun tanlang)' : '*'}
+              </div>
+              <div
+                onClick={() => fileRef.current?.click()}
+                style={{
+                  border: `2px dashed ${videoFile ? '#2563eb' : '#e2e8f0'}`,
+                  borderRadius: 12, padding: '24px 20px', textAlign: 'center', cursor: 'pointer',
+                  background: videoFile ? '#eff6ff' : '#fafafa', transition: 'all .2s',
+                }}
+              >
+                <Film size={28} color={videoFile ? '#2563eb' : '#94a3b8'} style={{ marginBottom: 8 }} />
+                {videoFile ? (
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{videoFile.name}</div>
+                    <div style={{ fontSize: 12, color: '#2563eb', marginTop: 4 }}>{formatBytes(videoFile.size)}</div>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: '#64748b' }}>Video tanlash uchun bosing</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>MP4, WebM, MOV — har qanday o'lcham</div>
+                  </div>
+                )}
+                <input ref={fileRef} type="file" accept="video/*" style={{ display: 'none' }}
+                  onChange={e => setVideoFile(e.target.files[0] || null)} />
+              </div>
+
+              {/* upload progress */}
+              {uploading && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12, fontWeight: 600, color: '#2563eb' }}>
+                    <span>Yuklanmoqda...</span><span>{uploadPct}%</span>
+                  </div>
+                  <div style={{ height: 8, background: '#e2e8f0', borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', background: 'linear-gradient(90deg,#2563eb,#7c3aed)', borderRadius: 99, width: `${uploadPct}%`, transition: 'width .3s' }} />
+                  </div>
                 </div>
-              </td>
-            </TRow>
-          ))}
-        </Tbl>
+              )}
+            </div>
 
-        <Pagination page={page} total={total} perPage={8} onChange={setPage}/>
+            {/* checkboxes */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#0f172a', gridColumn: '1/-1' }}>
+              <input type="checkbox" checked={form.is_visible} onChange={fCheck('is_visible')} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+              Ko'rinadigan (Visible)
+            </label>
+
+            {/* actions */}
+            <div style={{ gridColumn: '1/-1', display: 'flex', gap: 10 }}>
+              <Btn onClick={saveLesson} disabled={uploading}>
+                {uploading ? <><Upload size={13} />Yuklanmoqda...</> : <><Check size={13} />{editLesson ? 'Yangilash' : 'Saqlash'}</>}
+              </Btn>
+              <Btn variant="secondary" onClick={closeForm} disabled={uploading}>Bekor</Btn>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* lessons table */}
+      <Card>
+        <CardHead
+          title="Video darslar"
+          sub={`${filtered.length} ta dars`}
+          action={
+            <div style={{ display: 'flex', gap: 8 }}>
+              <select value={catFilter} onChange={e => { setCatFilter(e.target.value); reset(); }}
+                style={{ padding: '7px 10px', border: '1.5px solid #f1f5f9', borderRadius: 10, fontSize: 12, color: '#64748b', outline: 'none', background: '#fff' }}>
+                <option value="all">Barcha kategoriyalar</option>
+                {CATS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <button onClick={load}
+                style={{ padding: '7px 10px', border: '1.5px solid #f1f5f9', borderRadius: 10, fontSize: 12, color: '#64748b', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <RefreshCw size={12} />Yangilash
+              </button>
+              <Btn size="sm" onClick={openAdd}><Plus size={12} />Yangi dars</Btn>
+            </div>
+          }
+        />
+
+        {error && (
+          <div style={{ margin: '12px 20px', padding: '10px 14px', background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 10, display: 'flex', gap: 8, fontSize: 13, color: '#dc2626' }}>
+            <AlertCircle size={14} />{error}
+          </div>
+        )}
+
+        {loading ? (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>Yuklanmoqda...</div>
+        ) : filtered.length === 0 ? (
+          <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+            <Film size={40} color="#e2e8f0" style={{ marginBottom: 12 }} />
+            <div style={{ color: '#94a3b8', fontSize: 13 }}>Hali darslar yo'q. "Yangi dars" tugmasini bosing.</div>
+          </div>
+        ) : (
+          <>
+            <Tbl headers={['Dars nomi', 'Kategoriya', 'Davomiyligi', 'Ko\'rishlar', 'Tartib', 'Holat', 'Amallar']}>
+              {sliced.map(l => (
+                <TRow key={l.id} cells={[
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{l.title}</div>
+                    {l.description && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{l.description.slice(0, 60)}{l.description.length > 60 ? '...' : ''}</div>}
+                  </div>,
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: CAT_COLORS[l.category] || '#64748b', padding: '2px 8px', borderRadius: 7 }}>{l.category}</span>,
+                  <span style={{ fontSize: 12, color: '#64748b' }}>{l.duration || '—'}</span>,
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#059669' }}>{(l.views || 0).toLocaleString()}</span>,
+                  <span style={{ fontSize: 12, color: '#94a3b8' }}>{l.order}</span>,
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                    color: l.is_visible ? '#16a34a' : '#a16207', background: l.is_visible ? '#dcfce7' : '#fef9c3' }}>
+                    {l.is_visible ? 'Ko\'rinadi' : 'Yashirin'}
+                  </span>,
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    <ActionBtn icon={Play}    color="#2563eb" bg="#eff6ff" onClick={() => setPreview(l.video_url)} title="Ko'rish" />
+                    <ActionBtn icon={l.is_visible ? EyeOff : Eye} color="#f59e0b" bg="#fffbeb" onClick={() => toggleVisible(l)} title={l.is_visible ? 'Yashirish' : 'Ko\'rsatish'} />
+                    <ActionBtn icon={Edit3}   color="#059669" bg="#ecfdf5" onClick={() => openEdit(l)} title="Tahrirlash" />
+                    <ActionBtn icon={Trash2}  color="#dc2626" bg="#fee2e2" onClick={() => deleteLesson(l)} title="O'chirish" />
+                  </div>,
+                ]} />
+              ))}
+            </Tbl>
+            <Pagination page={page} total={total} perPage={10} onChange={setPage} />
+          </>
+        )}
       </Card>
 
-      <ConfirmModal
-        open={!!deleteTarget}
-        title="Darsni o'chirish"
-        message={`"${deleteTarget?.title}" darsini o'chirishni tasdiqlaysizmi?`}
-        confirmLabel="O'chirish"
-        danger
-        onConfirm={handleDelete}
-        onCancel={()=>setDel(null)}
-      />
+      <ConfirmModal {...(confirm || {})} open={!!confirm} onCancel={() => setConfirm(null)} />
     </div>
   );
 }

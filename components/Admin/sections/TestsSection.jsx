@@ -1,112 +1,163 @@
 "use client";
-import React, { useState, useMemo } from 'react';
-import { Plus, X, Edit3, Trash2, ChevronDown, ChevronRight, Check, BookOpen } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, X, Edit3, Trash2, Check, RefreshCw, AlertCircle } from 'lucide-react';
 import { Badge, Card, CardHead, Tbl, TRow, ActionBtn, Input, Select, Btn } from '../components/helpers';
 import { Pagination, usePagination } from '../components/Pagination';
 import { ConfirmModal } from '../components/ConfirmModal';
 
-const INIT_TESTS = [
-  { id:1, title:'IELTS Academic Mock 1', exam:'IELTS',    type:'mock',    q:160, attempts:8420, avg:'6.8', status:'live',  free:true,  questions:[
-    { id:1, text:'The recording mentions that the conference will be held in...', type:'mcq', options:['London','Paris','New York','Berlin'], answer:0 },
-    { id:2, text:'Complete the note: The registration fee is ___ dollars.', type:'fill', answer:'50' },
-    { id:3, text:'What is the main purpose of the speaker?', type:'mcq', options:['To inform','To persuade','To entertain','To warn'], answer:0 },
-  ]},
-  { id:2, title:'IELTS Academic Mock 2', exam:'IELTS',    type:'mock',    q:160, attempts:6231, avg:'7.1', status:'live',  free:true,  questions:[]},
-  { id:3, title:'Cambridge C1 Advanced', exam:'CAMBRIDGE',type:'mock',    q:140, attempts:3400, avg:'C1',  status:'live',  free:false, questions:[]},
-  { id:4, title:'TOEFL iBT Full Mock 1', exam:'TOEFL',    type:'mock',    q:144, attempts:4800, avg:'88',  status:'live',  free:true,  questions:[]},
-  { id:5, title:'SAT Full Practice 1',   exam:'SAT',      type:'mock',    q:98,  attempts:7400, avg:'1240',status:'live',  free:true,  questions:[]},
-  { id:6, title:'CEFR B2 Complete',      exam:'CEFR',     type:'mock',    q:90,  attempts:7600, avg:'B2',  status:'live',  free:false, questions:[]},
-  { id:7, title:'IELTS Writing Task 2',  exam:'IELTS',    type:'practice',q:2,   attempts:4900, avg:'6.5', status:'live',  free:false, questions:[]},
-  { id:8, title:'CEFR C1 Advanced',      exam:'CEFR',     type:'mock',    q:100, attempts:4300, avg:'C1',  status:'draft', free:false, questions:[]},
-  { id:9, title:'IELTS Listening Set A', exam:'IELTS',    type:'practice',q:40,  attempts:3100, avg:'7.0', status:'live',  free:true,  questions:[]},
-  { id:10,title:'Cambridge B2 First',    exam:'CAMBRIDGE',type:'mock',    q:130, attempts:2800, avg:'B2',  status:'draft', free:false, questions:[]},
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+const EXAM_TABS = [
+  { id: 'IELTS_CAMBRIDGE', label: 'IELTS & Cambridge', exams: ['IELTS', 'CAMBRIDGE'] },
+  { id: 'TOEFL',           label: 'TOEFL',             exams: ['TOEFL']              },
+  { id: 'SAT',             label: 'SAT',               exams: ['SAT']                },
+  { id: 'CEFR',            label: 'CEFR',              exams: ['CEFR']               },
 ];
 
-const BLANK_TEST = { title:'', exam:'IELTS', type:'mock', q:'', free:false, status:'draft' };
-const BLANK_Q    = { text:'', type:'mcq', options:['','','',''], answer:0 };
+const BLANK_FORM = {
+  title: '', exam_type: 'IELTS', test_type: 'mock',
+  level: '', question_count: '', time_minutes: 60,
+  difficulty: 3, is_published: true, is_new: true, description: '',
+};
+
+function authHeaders() {
+  const token = sessionStorage.getItem('ep_admin_token');
+  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
 
 export default function TestsSection({ toast }) {
-  const [tests, setTests]       = useState(INIT_TESTS);
-  const [examFilter, setExamF]  = useState('all');
-  const [typeFilter, setTypeF]  = useState('all');
-  const [showAdd, setShowAdd]   = useState(false);
-  const [editTest, setEditTest] = useState(null);
-  const [openQ, setOpenQ]       = useState(null);
-  const [form, setForm]         = useState(BLANK_TEST);
-  const [newQ, setNewQ]         = useState(BLANK_Q);
-  const [confirm, setConfirm]   = useState(null);
+  const [tests,     setTests]     = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState('');
+  const [activeTab, setActiveTab] = useState('IELTS_CAMBRIDGE');
+  const [typeFilter,setTypeFilter]= useState('all');
+  const [showForm,  setShowForm]  = useState(false);
+  const [editTest,  setEditTest]  = useState(null);
+  const [form,      setForm]      = useState(BLANK_FORM);
+  const [saving,    setSaving]    = useState(false);
+  const [confirm,   setConfirm]   = useState(null);
 
-  const filtered = useMemo(() => tests.filter(t =>
-    (examFilter === 'all' || t.exam === examFilter) &&
-    (typeFilter === 'all' || t.type === typeFilter)
-  ), [tests, examFilter, typeFilter]);
-
-  const { page, setPage, total, sliced, reset } = usePagination(filtered, 8);
-
-  /* save new test */
-  const saveTest = () => {
-    if (!form.title) { toast("Test nomini kiriting", 'error'); return; }
-    if (editTest) {
-      setTests(p => p.map(t => t.id === editTest.id ? { ...t, ...form, q: Number(form.q)||t.q } : t));
-      toast("Test yangilandi", 'success');
-    } else {
-      setTests(p => [{ ...form, id: Date.now(), q: Number(form.q)||0, attempts:0, avg:'—', questions:[] }, ...p]);
-      toast("Test qo'shildi", 'success');
+  /* ── fetch tests ─────────────────────────────────────────── */
+  const loadTests = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_URL}/api/admin/tests`, { headers: authHeaders() });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setTests(await res.json());
+    } catch (e) {
+      setError("Testlarni yuklashda xatolik: " + e.message);
+    } finally {
+      setLoading(false);
     }
-    setShowAdd(false); setEditTest(null); setForm(BLANK_TEST);
+  }, []);
+
+  useEffect(() => { loadTests(); }, [loadTests]);
+
+  /* ── filter by tab ───────────────────────────────────────── */
+  const currentTab   = EXAM_TABS.find(t => t.id === activeTab);
+  const filtered     = tests.filter(t =>
+    currentTab.exams.includes(t.exam_type) &&
+    (typeFilter === 'all' || t.test_type === typeFilter)
+  );
+  const { page, setPage, total, sliced, reset } = usePagination(filtered, 10);
+
+  /* ── open add/edit form ──────────────────────────────────── */
+  const openAdd = () => {
+    const defaultExam = currentTab.exams[0];
+    setForm({ ...BLANK_FORM, exam_type: defaultExam });
+    setEditTest(null);
+    setShowForm(true);
   };
 
-  /* delete test */
+  const openEdit = (t) => {
+    setForm({
+      title: t.title, exam_type: t.exam_type, test_type: t.test_type,
+      level: t.level || '', question_count: t.question_count,
+      time_minutes: t.time_minutes, difficulty: t.difficulty,
+      is_published: t.is_published, is_new: t.is_new, description: t.description || '',
+    });
+    setEditTest(t);
+    setShowForm(true);
+  };
+
+  const closeForm = () => { setShowForm(false); setEditTest(null); setForm(BLANK_FORM); };
+
+  /* ── save ────────────────────────────────────────────────── */
+  const saveTest = async () => {
+    if (!form.title.trim()) { toast("Test nomini kiriting", 'error'); return; }
+    setSaving(true);
+    try {
+      const payload = {
+        ...form,
+        question_count: Number(form.question_count) || 0,
+        time_minutes:   Number(form.time_minutes)   || 60,
+        difficulty:     Number(form.difficulty)     || 3,
+      };
+      const url    = editTest ? `${API_URL}/api/admin/tests/${editTest.id}` : `${API_URL}/api/admin/tests`;
+      const method = editTest ? 'PUT' : 'POST';
+      const res    = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(payload) });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.detail || res.status); }
+      toast(editTest ? "Test yangilandi ✓" : "Test qo'shildi ✓", 'success');
+      closeForm();
+      await loadTests();
+    } catch (e) {
+      toast("Xatolik: " + e.message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* ── delete ──────────────────────────────────────────────── */
   const deleteTest = (t) => {
     setConfirm({
       title: "Testni o'chirish",
-      message: `"${t.title}" testini o'chirasizmi? Bu amalni qaytarib bo'lmaydi.`,
+      message: `"${t.title}" testini o'chirasizmi?`,
       danger: true,
-      onConfirm: () => {
-        setTests(p => p.filter(x => x.id !== t.id));
-        toast("Test o'chirildi", 'success');
+      onConfirm: async () => {
         setConfirm(null);
-        if (openQ === t.id) setOpenQ(null);
+        try {
+          const res = await fetch(`${API_URL}/api/admin/tests/${t.id}`, { method: 'DELETE', headers: authHeaders() });
+          if (!res.ok) throw new Error(res.status);
+          toast("Test o'chirildi", 'success');
+          await loadTests();
+        } catch (e) {
+          toast("O'chirishda xatolik: " + e.message, 'error');
+        }
       },
     });
   };
 
-  /* add question */
-  const addQuestion = (testId) => {
-    if (!newQ.text) { toast("Savol matni kiriting", 'error'); return; }
-    setTests(p => p.map(t => t.id === testId
-      ? { ...t, questions: [...(t.questions||[]), { ...newQ, id: Date.now() }], q: t.q + 1 }
-      : t
-    ));
-    setNewQ(BLANK_Q);
-    toast("Savol qo'shildi", 'success');
-  };
+  const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
+  const fCheck = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.checked }));
 
-  /* delete question */
-  const deleteQ = (testId, qId) => {
-    setTests(p => p.map(t => t.id === testId
-      ? { ...t, questions: t.questions.filter(q => q.id !== qId), q: Math.max(0, t.q - 1) }
-      : t
-    ));
-    toast("Savol o'chirildi", 'success');
-  };
-
-  const openEdit = (t) => {
-    setForm({ title: t.title, exam: t.exam, type: t.type, q: t.q, free: t.free, status: t.status });
-    setEditTest(t);
-    setShowAdd(true);
-  };
+  /* ── exam options for current tab ───────────────────────── */
+  const examOptions = currentTab.exams;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
+      {/* tabs */}
+      <div style={{ display: 'flex', gap: 6 }}>
+        {EXAM_TABS.map(tab => (
+          <button key={tab.id} onClick={() => { setActiveTab(tab.id); reset(); setTypeFilter('all'); }}
+            style={{
+              padding: '8px 18px', borderRadius: 11, fontWeight: 700, fontSize: 13,
+              fontFamily: 'inherit', cursor: 'pointer', border: 'none', transition: 'all .18s',
+              background: activeTab === tab.id ? 'linear-gradient(135deg,#2563eb,#1d4ed8)' : '#f8fafc',
+              color: activeTab === tab.id ? '#fff' : '#64748b',
+              boxShadow: activeTab === tab.id ? '0 4px 14px rgba(37,99,235,0.25)' : 'none',
+            }}>{tab.label}</button>
+        ))}
+      </div>
+
       {/* add / edit form */}
-      {showAdd && (
+      {showForm && (
         <Card>
           <CardHead
             title={editTest ? "Testni tahrirlash" : "Yangi test qo'shish"}
             action={
-              <button onClick={() => { setShowAdd(false); setEditTest(null); setForm(BLANK_TEST); }}
+              <button onClick={closeForm}
                 style={{ width: 30, height: 30, borderRadius: 8, background: '#fee2e2', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={13} color="#dc2626" />
               </button>
@@ -114,19 +165,35 @@ export default function TestsSection({ toast }) {
           />
           <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             <div style={{ gridColumn: '1/-1' }}>
-              <Input label="Test nomi" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="IELTS Academic Mock Test 1" />
+              <Input label="Test nomi *" value={form.title} onChange={f('title')} placeholder="IELTS Academic Mock Test 1" />
             </div>
-            <Select label="Exam" value={form.exam} onChange={e => setForm(p => ({ ...p, exam: e.target.value }))} options={['IELTS','CAMBRIDGE','TOEFL','CEFR','SAT']} />
-            <Select label="Turi" value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))} options={['mock','practice','skill']} />
-            <Select label="Status" value={form.status} onChange={e => setForm(p => ({ ...p, status: e.target.value }))} options={['live','draft']} />
-            <Input label="Savollar soni" value={form.q} onChange={e => setForm(p => ({ ...p, q: e.target.value }))} placeholder="160" type="number" />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'flex-end', paddingBottom: 2 }}>
-              <input type="checkbox" id="free-t" checked={form.free} onChange={e => setForm(p => ({ ...p, free: e.target.checked }))} style={{ width: 16, height: 16, cursor: 'pointer' }} />
-              <label htmlFor="free-t" style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}>Bepul (FREE)</label>
+            <Select label="Exam turi" value={form.exam_type} onChange={f('exam_type')}
+              options={examOptions} />
+            <Select label="Test turi" value={form.test_type} onChange={f('test_type')}
+              options={['mock', 'practice', 'skill']} />
+            <Input label="Daraja (level)" value={form.level} onChange={f('level')} placeholder="B2, C1, Band 7..." />
+            <Input label="Savollar soni" value={form.question_count} onChange={f('question_count')} placeholder="160" type="number" />
+            <Input label="Vaqt (daqiqa)" value={form.time_minutes} onChange={f('time_minutes')} placeholder="60" type="number" />
+            <Select label="Qiyinlik (1-5)" value={form.difficulty} onChange={f('difficulty')}
+              options={[{value:1,label:'1 — Juda oson'},{value:2,label:'2 — Oson'},{value:3,label:'3 — O\'rta'},{value:4,label:'4 — Qiyin'},{value:5,label:'5 — Juda qiyin'}]} />
+            <div style={{ gridColumn: '1/-1' }}>
+              <Input label="Tavsif (ixtiyoriy)" value={form.description} onChange={f('description')} placeholder="Bu test haqida qisqacha..." />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, gridColumn: '1/-1' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                <input type="checkbox" checked={form.is_published} onChange={fCheck('is_published')} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                Nashr qilingan (Published)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#0f172a' }}>
+                <input type="checkbox" checked={form.is_new} onChange={fCheck('is_new')} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                Yangi (NEW badge)
+              </label>
             </div>
             <div style={{ gridColumn: '1/-1', display: 'flex', gap: 10 }}>
-              <Btn onClick={saveTest}><Check size={13} />{editTest ? 'Yangilash' : "Saqlash"}</Btn>
-              <Btn variant="secondary" onClick={() => { setShowAdd(false); setEditTest(null); setForm(BLANK_TEST); }}>Bekor</Btn>
+              <Btn onClick={saveTest} disabled={saving}>
+                <Check size={13} />{saving ? 'Saqlanmoqda...' : (editTest ? 'Yangilash' : 'Saqlash')}
+              </Btn>
+              <Btn variant="secondary" onClick={closeForm}>Bekor</Btn>
             </div>
           </div>
         </Card>
@@ -135,127 +202,74 @@ export default function TestsSection({ toast }) {
       {/* tests table */}
       <Card>
         <CardHead
-          title="Barcha testlar"
-          sub={`${filtered.length} ta`}
+          title={currentTab.label + " testlari"}
+          sub={`${filtered.length} ta test`}
           action={
             <div style={{ display: 'flex', gap: 8 }}>
-              <select value={examFilter} onChange={e => { setExamF(e.target.value); reset(); }}
-                style={{ padding: '7px 10px', border: '1.5px solid #f1f5f9', borderRadius: 10, fontSize: 12, color: '#64748b', outline: 'none', background: '#fff' }}>
-                <option value="all">Barcha examlar</option>
-                {['IELTS','CAMBRIDGE','TOEFL','CEFR','SAT'].map(e => <option key={e} value={e}>{e}</option>)}
-              </select>
-              <select value={typeFilter} onChange={e => { setTypeF(e.target.value); reset(); }}
+              <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); reset(); }}
                 style={{ padding: '7px 10px', border: '1.5px solid #f1f5f9', borderRadius: 10, fontSize: 12, color: '#64748b', outline: 'none', background: '#fff' }}>
                 <option value="all">Barcha turlar</option>
                 <option value="mock">Mock</option>
                 <option value="practice">Practice</option>
                 <option value="skill">Skill</option>
               </select>
-              <Btn size="sm" onClick={() => { setShowAdd(true); setEditTest(null); setForm(BLANK_TEST); }}>
+              <button onClick={loadTests}
+                style={{ padding: '7px 10px', border: '1.5px solid #f1f5f9', borderRadius: 10, fontSize: 12, color: '#64748b', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <RefreshCw size={12} />Yangilash
+              </button>
+              <Btn size="sm" onClick={openAdd}>
                 <Plus size={12} />Yangi test
               </Btn>
             </div>
           }
         />
 
-        <Tbl headers={['', 'Test nomi', 'Exam', 'Tur', 'Savollar', 'Urinishlar', "O'rt. ball", 'Narx', 'Status', 'Amallar']}>
-          {sliced.map(t => (
-            <React.Fragment key={t.id}>
-              <TRow cells={[
-                /* expand */
-                <button onClick={() => setOpenQ(openQ === t.id ? null : t.id)}
-                  style={{ width: 24, height: 24, borderRadius: 7, background: openQ === t.id ? '#eff6ff' : '#f8fafc', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {openQ === t.id ? <ChevronDown size={12} color="#2563eb" /> : <ChevronRight size={12} color="#94a3b8" />}
-                </button>,
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>{t.title}</div>
-                  <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>{(t.questions||[]).length} savol qo'shilgan</div>
-                </div>,
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#2563eb', background: '#eff6ff', padding: '2px 7px', borderRadius: 7 }}>{t.exam}</span>,
-                <span style={{ fontSize: 11, color: '#64748b', background: '#f8fafc', padding: '2px 7px', borderRadius: 7 }}>{t.type}</span>,
-                <span style={{ fontWeight: 700 }}>{t.q}</span>,
-                <span style={{ fontWeight: 700, color: '#059669' }}>{t.attempts.toLocaleString()}</span>,
-                <span style={{ fontWeight: 800, color: '#2563eb' }}>{t.avg}</span>,
-                t.free
-                  ? <span style={{ fontSize: 10, fontWeight: 800, color: '#059669', background: '#d1fae5', padding: '2px 8px', borderRadius: 20 }}>FREE</span>
-                  : <span style={{ fontSize: 10, fontWeight: 800, color: '#7c3aed', background: '#ede9fe', padding: '2px 8px', borderRadius: 20 }}>PRO</span>,
-                <Badge type={t.status} />,
-                <div style={{ display: 'flex', gap: 5 }}>
-                  <ActionBtn icon={Edit3} color="#2563eb" bg="#eff6ff" onClick={() => openEdit(t)} title="Tahrirlash" />
-                  <ActionBtn icon={Trash2} color="#dc2626" bg="#fee2e2" onClick={() => deleteTest(t)} title="O'chirish" />
-                </div>,
-              ]} />
+        {/* error */}
+        {error && (
+          <div style={{ margin: '12px 20px', padding: '10px 14px', background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#dc2626' }}>
+            <AlertCircle size={14} />{error}
+          </div>
+        )}
 
-              {/* question panel */}
-              {openQ === t.id && (
-                <tr>
-                  <td colSpan={10} style={{ padding: 0, background: '#fafcff', borderBottom: '1px solid #f1f5f9' }}>
-                    <div style={{ padding: '16px 20px 20px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                        <BookOpen size={14} color="#2563eb" />
-                        <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Savollar ({(t.questions||[]).length} ta)</span>
-                      </div>
-
-                      {/* existing questions */}
-                      {(t.questions||[]).length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-                          {t.questions.map((q, qi) => (
-                            <div key={q.id} style={{ background: '#fff', border: '1.5px solid #f1f5f9', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                              <div style={{ width: 22, height: 22, borderRadius: 7, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#2563eb', flexShrink: 0 }}>{qi + 1}</div>
-                              <div style={{ flex: 1 }}>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a', marginBottom: 4 }}>{q.text}</div>
-                                {q.type === 'mcq' && (
-                                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                    {q.options.map((opt, oi) => (
-                                      <span key={oi} style={{ fontSize: 11, padding: '2px 9px', borderRadius: 8, background: oi === q.answer ? '#dcfce7' : '#f8fafc', color: oi === q.answer ? '#16a34a' : '#64748b', border: `1px solid ${oi === q.answer ? '#bbf7d0' : '#f1f5f9'}`, fontWeight: oi === q.answer ? 700 : 500 }}>{opt || `Variant ${oi + 1}`}</span>
-                                    ))}
-                                  </div>
-                                )}
-                                {q.type === 'fill' && (
-                                  <span style={{ fontSize: 11, color: '#059669', fontWeight: 700 }}>Javob: {q.answer}</span>
-                                )}
-                              </div>
-                              <ActionBtn icon={Trash2} color="#dc2626" bg="#fee2e2" onClick={() => deleteQ(t.id, q.id)} title="O'chirish" />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* add question form */}
-                      <div style={{ background: '#fff', border: '1.5px dashed #dbeafe', borderRadius: 12, padding: '14px 16px' }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: '#2563eb', marginBottom: 10 }}>+ Yangi savol qo'shish</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, marginBottom: 10 }}>
-                          <Input value={newQ.text} onChange={e => setNewQ(p => ({ ...p, text: e.target.value }))} placeholder="Savol matni..." />
-                          <Select value={newQ.type} onChange={e => setNewQ(p => ({ ...p, type: e.target.value, options: ['','','',''], answer: 0 }))}
-                            options={[{ value:'mcq', label:'Test (MCQ)' }, { value:'fill', label:"To'ldirish" }]} />
-                        </div>
-                        {newQ.type === 'mcq' && (
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                            {newQ.options.map((opt, i) => (
-                              <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                <input type="radio" name="correct" checked={newQ.answer === i} onChange={() => setNewQ(p => ({ ...p, answer: i }))} style={{ cursor: 'pointer' }} />
-                                <input value={opt} onChange={e => setNewQ(p => { const o = [...p.options]; o[i] = e.target.value; return { ...p, options: o }; })}
-                                  placeholder={`Variant ${i + 1}`}
-                                  style={{ flex: 1, padding: '6px 10px', border: '1.5px solid #f1f5f9', borderRadius: 8, fontSize: 12, outline: 'none', color: '#0f172a' }} />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {newQ.type === 'fill' && (
-                          <div style={{ marginBottom: 10 }}>
-                            <Input value={typeof newQ.answer === 'string' ? newQ.answer : ''} onChange={e => setNewQ(p => ({ ...p, answer: e.target.value }))} placeholder="To'g'ri javob..." />
-                          </div>
-                        )}
-                        <Btn size="sm" onClick={() => addQuestion(t.id)}><Plus size={12} />Savolni qo'shish</Btn>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </React.Fragment>
-          ))}
-        </Tbl>
-        <Pagination page={page} total={total} perPage={8} onChange={setPage} />
+        {/* loading */}
+        {loading ? (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+            Yuklanmoqda...
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+            Bu bo'limda testlar yo'q. "Yangi test" tugmasini bosib qo'shing.
+          </div>
+        ) : (
+          <>
+            <Tbl headers={['Test nomi', 'Exam', 'Tur', 'Daraja', 'Savollar', 'Vaqt', 'Qiyinlik', 'Holat', 'Amallar']}>
+              {sliced.map(t => (
+                <TRow key={t.id} cells={[
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{t.title}</div>
+                    {t.is_new && <span style={{ fontSize: 9, fontWeight: 800, color: '#059669', background: '#d1fae5', padding: '1px 6px', borderRadius: 6 }}>NEW</span>}
+                  </div>,
+                  <span style={{ fontSize: 10, fontWeight: 700, color: '#2563eb', background: '#eff6ff', padding: '2px 7px', borderRadius: 7 }}>{t.exam_type}</span>,
+                  <span style={{ fontSize: 11, color: '#64748b', background: '#f8fafc', padding: '2px 7px', borderRadius: 7 }}>{t.test_type}</span>,
+                  <span style={{ fontSize: 12, color: '#64748b' }}>{t.level || '—'}</span>,
+                  <span style={{ fontWeight: 700 }}>{t.question_count}</span>,
+                  <span style={{ fontSize: 12, color: '#64748b' }}>{t.time_minutes} min</span>,
+                  <div style={{ display: 'flex', gap: 2 }}>
+                    {[1,2,3,4,5].map(i => (
+                      <div key={i} style={{ width: 8, height: 8, borderRadius: 2, background: i <= t.difficulty ? '#2563eb' : '#e2e8f0' }} />
+                    ))}
+                  </div>,
+                  <Badge type={t.is_published ? 'live' : 'draft'} />,
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    <ActionBtn icon={Edit3}  color="#2563eb" bg="#eff6ff" onClick={() => openEdit(t)} title="Tahrirlash" />
+                    <ActionBtn icon={Trash2} color="#dc2626" bg="#fee2e2" onClick={() => deleteTest(t)} title="O'chirish" />
+                  </div>,
+                ]} />
+              ))}
+            </Tbl>
+            <Pagination page={page} total={total} perPage={10} onChange={setPage} />
+          </>
+        )}
       </Card>
 
       <ConfirmModal {...(confirm || {})} open={!!confirm} onCancel={() => setConfirm(null)} />

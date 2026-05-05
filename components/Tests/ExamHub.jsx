@@ -260,6 +260,24 @@ function TestCard({ t, onStart, freeUsed, isAuth, isPro }) {
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+function apiTestToLocal(t) {
+  return {
+    id:       String(t.id),
+    title:    t.title,
+    type:     t.test_type,
+    level:    t.level || '',
+    q:        t.question_count,
+    time:     `${t.time_minutes} min`,
+    diff:     t.difficulty,
+    done:     t.attempts,
+    rating:   t.rating,
+    new:      t.is_new,
+    sections: Array.isArray(t.sections) ? t.sections : [],
+  };
+}
+
 export default function ExamHub() {
   const { user, isAuthenticated, openAuthModal } = useAuth();
   const [active, setActive]       = useState('IELTS');
@@ -268,12 +286,29 @@ export default function ExamHub() {
   const [started, setStarted]     = useState(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [isMobile, setIsMobile]   = useState(false);
+  const [apiTests, setApiTests]   = useState(null); // null = loading, {} = loaded
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
+  }, []);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/tests`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        if (!Array.isArray(data) || data.length === 0) { setApiTests({}); return; }
+        const grouped = {};
+        data.forEach(t => {
+          const key = t.exam_type;
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(apiTestToLocal(t));
+        });
+        setApiTests(grouped);
+      })
+      .catch(() => setApiTests({}));
   }, []);
 
   const isPro = user?.plan === 'pro' || user?.is_premium || user?.is_admin || false;
@@ -296,7 +331,8 @@ export default function ExamHub() {
   };
 
   const exam = EXAMS.find(x => x.id === active);
-  const all  = TESTS[active] || [];
+  const testsSource = (apiTests && Object.keys(apiTests).length > 0) ? apiTests : TESTS;
+  const all  = testsSource[active] || [];
   const list = all.filter(t =>
     (filter === 'all' || t.type === filter) &&
     t.title.toLowerCase().includes(search.toLowerCase())
