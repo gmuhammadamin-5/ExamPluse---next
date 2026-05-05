@@ -20,18 +20,21 @@ function formatBytes(bytes) {
 }
 
 export default function LessonsSection({ toast }) {
-  const [lessons,    setLessons]   = useState([]);
-  const [loading,    setLoading]   = useState(true);
-  const [error,      setError]     = useState('');
-  const [catFilter,  setCatFilter] = useState('all');
-  const [showForm,   setShowForm]  = useState(false);
-  const [editLesson, setEditLesson]= useState(null);
-  const [form,       setForm]      = useState(BLANK);
-  const [videoFile,  setVideoFile] = useState(null);
-  const [uploading,  setUploading] = useState(false);
-  const [uploadPct,  setUploadPct] = useState(0);
-  const [confirm,    setConfirm]   = useState(null);
-  const [preview,    setPreview]   = useState(null);
+  const [lessons,    setLessons]    = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState('');
+  const [catFilter,  setCatFilter]  = useState('all');
+  const [showForm,   setShowForm]   = useState(false);
+  const [editLesson, setEditLesson] = useState(null);
+  const [form,       setForm]       = useState(BLANK);
+  const [videoFile,  setVideoFile]  = useState(null);
+  const [videoUrl,   setVideoUrl]   = useState('');   // uploaded public URL
+  const [uploading,  setUploading]  = useState(false);
+  const [uploadPct,  setUploadPct]  = useState(0);
+  const [uploadDone, setUploadDone] = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [confirm,    setConfirm]    = useState(null);
+  const [preview,    setPreview]    = useState(null);
   const fileRef = useRef(null);
 
   /* ── fetch ──────────────────────────────────────────────── */
@@ -43,7 +46,7 @@ export default function LessonsSection({ toast }) {
       });
       if (!res.ok) throw new Error(res.status);
       setLessons(await res.json());
-    } catch (e) { setError('Yuklab bo\'lmadi: ' + e.message); }
+    } catch (e) { setError("Yuklab bo'lmadi: " + e.message); }
     finally { setLoading(false); }
   }, []);
 
@@ -54,65 +57,104 @@ export default function LessonsSection({ toast }) {
   const { page, setPage, total, sliced, reset } = usePagination(filtered, 10);
 
   /* ── form helpers ───────────────────────────────────────── */
-  const openAdd = () => { setForm(BLANK); setVideoFile(null); setEditLesson(null); setShowForm(true); };
-  const openEdit = (l) => {
-    setForm({ title: l.title, category: l.category, description: l.description || '', duration: l.duration || '', order: String(l.order), is_visible: l.is_visible });
-    setVideoFile(null);
-    setEditLesson(l);
-    setShowForm(true);
+  const openAdd = () => {
+    setForm(BLANK); setVideoFile(null); setVideoUrl(''); setUploadDone(false);
+    setEditLesson(null); setShowForm(true);
   };
-  const closeForm = () => { setShowForm(false); setEditLesson(null); setVideoFile(null); setUploadPct(0); };
+  const openEdit = (l) => {
+    setForm({ title: l.title, category: l.category, description: l.description || '',
+      duration: l.duration || '', order: String(l.order), is_visible: l.is_visible });
+    setVideoFile(null); setVideoUrl(l.video_url || ''); setUploadDone(true);
+    setEditLesson(l); setShowForm(true);
+  };
+  const closeForm = () => {
+    setShowForm(false); setEditLesson(null); setVideoFile(null);
+    setVideoUrl(''); setUploadDone(false); setUploadPct(0);
+  };
   const f = k => e => setForm(p => ({ ...p, [k]: e.target.value }));
   const fCheck = k => e => setForm(p => ({ ...p, [k]: e.target.checked }));
 
-  /* ── upload with XHR (progress tracking) ───────────────── */
-  const saveLesson = () => {
-    if (!form.title.trim()) { toast('Dars nomini kiriting', 'error'); return; }
-    if (!editLesson && !videoFile) { toast('Video fayl tanlang', 'error'); return; }
+  /* ── Step 1: upload video directly to Supabase ──────────── */
+  const uploadVideo = async (file) => {
+    setUploading(true); setUploadPct(0); setUploadDone(false); setVideoUrl('');
+    try {
+      // 1. Get signed upload URL from backend
+      const urlRes = await fetch(`${API_URL}/api/admin/lessons/upload-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken()}` },
+        body: JSON.stringify({ filename: file.name }),
+      });
+      if (!urlRes.ok) throw new Error('Signed URL olishda xatolik');
+      const { signed_url, public_url, token } = await urlRes.json();
 
-    setUploading(true);
-    setUploadPct(0);
+      // 2. Upload file directly to Supabase using XHR (for progress)
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        // Supabase signed URL upload format
+        const uploadUrl = `${signed_url}${token ? `?token=${token}` : ''}`;
+        xhr.open('PUT', signed_url);
+        xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+        xhr.upload.onprogress = e => {
+          if (e.lengthComputable) setUploadPct(Math.round(e.loaded / e.total * 100));
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else reject(new Error(`Supabase xatolik: ${xhr.status} ${xhr.responseText}`));
+        };
+        xhr.onerror = () => reject(new Error('Tarmoq xatoligi'));
+        xhr.send(file);
+      });
 
-    const data = new FormData();
-    data.append('title',       form.title);
-    data.append('category',    form.category);
-    data.append('description', form.description);
-    data.append('duration',    form.duration);
-    data.append('order',       form.order || '0');
-    data.append('is_visible',  form.is_visible ? 'true' : 'false');
-    if (videoFile) data.append('video', videoFile);
-
-    const url    = editLesson ? `${API_URL}/api/admin/lessons/${editLesson.id}` : `${API_URL}/api/admin/lessons`;
-    const method = editLesson ? 'PUT' : 'POST';
-
-    const xhr = new XMLHttpRequest();
-    xhr.open(method, url);
-    xhr.setRequestHeader('Authorization', `Bearer ${adminToken()}`);
-
-    xhr.upload.onprogress = e => {
-      if (e.lengthComputable) setUploadPct(Math.round(e.loaded / e.total * 100));
-    };
-
-    xhr.onload = async () => {
+      setVideoUrl(public_url);
+      setUploadDone(true);
+      toast('Video yuklandi ✓', 'success');
+    } catch (e) {
+      toast('Video yuklashda xatolik: ' + e.message, 'error');
+    } finally {
       setUploading(false);
-      if (xhr.status >= 200 && xhr.status < 300) {
-        toast(editLesson ? 'Dars yangilandi ✓' : 'Dars qo\'shildi ✓', 'success');
-        closeForm();
-        load();
-      } else {
-        try { const d = JSON.parse(xhr.responseText); toast('Xatolik: ' + (d.detail || xhr.status), 'error'); }
-        catch { toast('Xatolik: ' + xhr.status, 'error'); }
-      }
-    };
-    xhr.onerror = () => { setUploading(false); toast('Tarmoq xatoligi', 'error'); };
-    xhr.send(data);
+    }
+  };
+
+  const onFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setVideoFile(file);
+    uploadVideo(file);
+  };
+
+  /* ── Step 2: save metadata to backend ──────────────────── */
+  const saveLesson = async () => {
+    if (!form.title.trim()) { toast('Dars nomini kiriting', 'error'); return; }
+    if (!videoUrl) { toast('Avval video yuklang', 'error'); return; }
+    setSaving(true);
+    try {
+      const payload = {
+        title: form.title, category: form.category, description: form.description,
+        video_url: videoUrl, duration: form.duration,
+        order: Number(form.order) || 0, is_visible: form.is_visible,
+      };
+      const url    = editLesson ? `${API_URL}/api/admin/lessons/${editLesson.id}` : `${API_URL}/api/admin/lessons`;
+      const method = editLesson ? 'PUT' : 'POST';
+      const res    = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken()}` },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.detail || res.status); }
+      toast(editLesson ? 'Dars yangilandi ✓' : "Dars qo'shildi ✓", 'success');
+      closeForm(); load();
+    } catch (e) {
+      toast('Xatolik: ' + e.message, 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   /* ── delete ─────────────────────────────────────────────── */
   const deleteLesson = (l) => {
     setConfirm({
-      title: 'Darsni o\'chirish',
-      message: `"${l.title}" darsini o'chirasizmi? Video ham o'chib ketadi.`,
+      title: "Darsni o'chirish",
+      message: `"${l.title}" darsini o'chirasizmi?`,
       danger: true,
       onConfirm: async () => {
         setConfirm(null);
@@ -121,25 +163,20 @@ export default function LessonsSection({ toast }) {
             method: 'DELETE', headers: { Authorization: `Bearer ${adminToken()}` },
           });
           if (!res.ok) throw new Error(res.status);
-          toast('Dars o\'chirildi', 'success');
-          load();
-        } catch (e) { toast('O\'chirishda xatolik: ' + e.message, 'error'); }
+          toast("Dars o'chirildi", 'success'); load();
+        } catch (e) { toast("O'chirishda xatolik: " + e.message, 'error'); }
       },
     });
   };
 
   /* ── toggle visibility ──────────────────────────────────── */
   const toggleVisible = async (l) => {
-    const data = new FormData();
-    data.append('title',       l.title);
-    data.append('category',    l.category);
-    data.append('description', l.description || '');
-    data.append('duration',    l.duration || '');
-    data.append('order',       String(l.order));
-    data.append('is_visible',  (!l.is_visible).toString());
     try {
       await fetch(`${API_URL}/api/admin/lessons/${l.id}`, {
-        method: 'PUT', headers: { Authorization: `Bearer ${adminToken()}` }, body: data,
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken()}` },
+        body: JSON.stringify({ title: l.title, category: l.category, description: l.description || '',
+          video_url: l.video_url, duration: l.duration || '', order: l.order, is_visible: !l.is_visible }),
       });
       load();
     } catch { toast('Xatolik', 'error'); }
@@ -150,14 +187,14 @@ export default function LessonsSection({ toast }) {
 
       {/* Video preview modal */}
       {preview && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={() => setPreview(null)}>
-          <div style={{ position: 'relative', width: '90%', maxWidth: 900 }} onClick={e => e.stopPropagation()}>
+          <div style={{ position: 'relative', width: '90%', maxWidth: 960 }} onClick={e => e.stopPropagation()}>
             <button onClick={() => setPreview(null)}
-              style={{ position: 'absolute', top: -40, right: 0, background: 'none', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 14 }}>
-              <X size={22} color="#fff" /> Yopish
+              style={{ position: 'absolute', top: -40, right: 0, background: 'none', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontFamily: 'inherit' }}>
+              <X size={18} /> Yopish
             </button>
-            <video src={preview} controls autoPlay style={{ width: '100%', borderRadius: 14, maxHeight: '80vh' }} />
+            <video src={preview} controls autoPlay style={{ width: '100%', borderRadius: 14, maxHeight: '80vh', background: '#000' }} />
           </div>
         </div>
       )}
@@ -166,7 +203,7 @@ export default function LessonsSection({ toast }) {
       {showForm && (
         <Card>
           <CardHead
-            title={editLesson ? 'Darsni tahrirlash' : 'Yangi dars qo\'shish'}
+            title={editLesson ? 'Darsni tahrirlash' : "Yangi dars qo'shish"}
             action={
               <button onClick={closeForm} style={{ width: 30, height: 30, borderRadius: 8, background: '#fee2e2', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <X size={13} color="#dc2626" />
@@ -175,7 +212,6 @@ export default function LessonsSection({ toast }) {
           />
           <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
 
-            {/* title */}
             <div style={{ gridColumn: '1/-1' }}>
               <Input label="Dars nomi *" value={form.title} onChange={f('title')} placeholder="IELTS Writing Task 2 - Essay yozish" />
             </div>
@@ -188,46 +224,51 @@ export default function LessonsSection({ toast }) {
               <Input label="Tavsif (ixtiyoriy)" value={form.description} onChange={f('description')} placeholder="Bu darsda nima o'rganasiz..." />
             </div>
 
-            {/* video file picker */}
+            {/* Video upload area */}
             <div style={{ gridColumn: '1/-1' }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 8 }}>
-                Video fayl {editLesson ? '(yangilash uchun tanlang)' : '*'}
+                Video fayl {editLesson ? '(yangi video yuklash — ixtiyoriy)' : '*'}
               </div>
-              <div
-                onClick={() => fileRef.current?.click()}
-                style={{
-                  border: `2px dashed ${videoFile ? '#2563eb' : '#e2e8f0'}`,
-                  borderRadius: 12, padding: '24px 20px', textAlign: 'center', cursor: 'pointer',
-                  background: videoFile ? '#eff6ff' : '#fafafa', transition: 'all .2s',
-                }}
-              >
-                <Film size={28} color={videoFile ? '#2563eb' : '#94a3b8'} style={{ marginBottom: 8 }} />
-                {videoFile ? (
+
+              {/* Upload box */}
+              <div onClick={() => !uploading && fileRef.current?.click()}
+                style={{ border: `2px dashed ${uploadDone ? '#059669' : uploading ? '#2563eb' : '#e2e8f0'}`,
+                  borderRadius: 12, padding: '28px 20px', textAlign: 'center',
+                  cursor: uploading ? 'default' : 'pointer',
+                  background: uploadDone ? '#f0fdf4' : uploading ? '#eff6ff' : '#fafafa', transition: 'all .2s' }}>
+
+                {uploadDone ? (
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{videoFile.name}</div>
-                    <div style={{ fontSize: 12, color: '#2563eb', marginTop: 4 }}>{formatBytes(videoFile.size)}</div>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: '#059669' }}>Video yuklandi!</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
+                      {videoFile ? videoFile.name : 'Mavjud video'}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#2563eb', marginTop: 6, cursor: 'pointer', textDecoration: 'underline' }}>
+                      Boshqa video tanlash
+                    </div>
+                  </div>
+                ) : uploading ? (
+                  <div>
+                    <Upload size={28} color="#2563eb" style={{ marginBottom: 10 }} />
+                    <div style={{ fontWeight: 700, fontSize: 14, color: '#2563eb', marginBottom: 12 }}>
+                      Supabase ga yuklanmoqda... {uploadPct}%
+                    </div>
+                    <div style={{ height: 10, background: '#dbeafe', borderRadius: 99, overflow: 'hidden', maxWidth: 300, margin: '0 auto' }}>
+                      <div style={{ height: '100%', background: 'linear-gradient(90deg,#2563eb,#7c3aed)',
+                        borderRadius: 99, width: `${uploadPct}%`, transition: 'width .3s' }} />
+                    </div>
                   </div>
                 ) : (
                   <div>
+                    <Film size={32} color="#94a3b8" style={{ marginBottom: 10 }} />
                     <div style={{ fontWeight: 600, fontSize: 14, color: '#64748b' }}>Video tanlash uchun bosing</div>
                     <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>MP4, WebM, MOV — har qanday o'lcham</div>
                   </div>
                 )}
-                <input ref={fileRef} type="file" accept="video/*" style={{ display: 'none' }}
-                  onChange={e => setVideoFile(e.target.files[0] || null)} />
-              </div>
 
-              {/* upload progress */}
-              {uploading && (
-                <div style={{ marginTop: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12, fontWeight: 600, color: '#2563eb' }}>
-                    <span>Yuklanmoqda...</span><span>{uploadPct}%</span>
-                  </div>
-                  <div style={{ height: 8, background: '#e2e8f0', borderRadius: 99, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', background: 'linear-gradient(90deg,#2563eb,#7c3aed)', borderRadius: 99, width: `${uploadPct}%`, transition: 'width .3s' }} />
-                  </div>
-                </div>
-              )}
+                <input ref={fileRef} type="file" accept="video/*" style={{ display: 'none' }} onChange={onFileChange} />
+              </div>
             </div>
 
             {/* checkboxes */}
@@ -236,12 +277,11 @@ export default function LessonsSection({ toast }) {
               Ko'rinadigan (Visible)
             </label>
 
-            {/* actions */}
             <div style={{ gridColumn: '1/-1', display: 'flex', gap: 10 }}>
-              <Btn onClick={saveLesson} disabled={uploading}>
-                {uploading ? <><Upload size={13} />Yuklanmoqda...</> : <><Check size={13} />{editLesson ? 'Yangilash' : 'Saqlash'}</>}
+              <Btn onClick={saveLesson} disabled={saving || uploading}>
+                {saving ? <><Upload size={13} />Saqlanmoqda...</> : <><Check size={13} />{editLesson ? 'Yangilash' : 'Saqlash'}</>}
               </Btn>
-              <Btn variant="secondary" onClick={closeForm} disabled={uploading}>Bekor</Btn>
+              <Btn variant="secondary" onClick={closeForm} disabled={uploading || saving}>Bekor</Btn>
             </div>
           </div>
         </Card>
@@ -283,12 +323,12 @@ export default function LessonsSection({ toast }) {
           </div>
         ) : (
           <>
-            <Tbl headers={['Dars nomi', 'Kategoriya', 'Davomiyligi', 'Ko\'rishlar', 'Tartib', 'Holat', 'Amallar']}>
+            <Tbl headers={['Dars nomi', 'Kategoriya', 'Davomiyligi', "Ko'rishlar", 'Tartib', 'Holat', 'Amallar']}>
               {sliced.map(l => (
                 <TRow key={l.id} cells={[
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 13 }}>{l.title}</div>
-                    {l.description && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{l.description.slice(0, 60)}{l.description.length > 60 ? '...' : ''}</div>}
+                    {l.description && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{l.description.slice(0, 55)}{l.description.length > 55 ? '...' : ''}</div>}
                   </div>,
                   <span style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: CAT_COLORS[l.category] || '#64748b', padding: '2px 8px', borderRadius: 7 }}>{l.category}</span>,
                   <span style={{ fontSize: 12, color: '#64748b' }}>{l.duration || '—'}</span>,
@@ -296,11 +336,11 @@ export default function LessonsSection({ toast }) {
                   <span style={{ fontSize: 12, color: '#94a3b8' }}>{l.order}</span>,
                   <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
                     color: l.is_visible ? '#16a34a' : '#a16207', background: l.is_visible ? '#dcfce7' : '#fef9c3' }}>
-                    {l.is_visible ? 'Ko\'rinadi' : 'Yashirin'}
+                    {l.is_visible ? "Ko'rinadi" : 'Yashirin'}
                   </span>,
                   <div style={{ display: 'flex', gap: 5 }}>
                     <ActionBtn icon={Play}    color="#2563eb" bg="#eff6ff" onClick={() => setPreview(l.video_url)} title="Ko'rish" />
-                    <ActionBtn icon={l.is_visible ? EyeOff : Eye} color="#f59e0b" bg="#fffbeb" onClick={() => toggleVisible(l)} title={l.is_visible ? 'Yashirish' : 'Ko\'rsatish'} />
+                    <ActionBtn icon={l.is_visible ? EyeOff : Eye} color="#f59e0b" bg="#fffbeb" onClick={() => toggleVisible(l)} title={l.is_visible ? 'Yashirish' : "Ko'rsatish"} />
                     <ActionBtn icon={Edit3}   color="#059669" bg="#ecfdf5" onClick={() => openEdit(l)} title="Tahrirlash" />
                     <ActionBtn icon={Trash2}  color="#dc2626" bg="#fee2e2" onClick={() => deleteLesson(l)} title="O'chirish" />
                   </div>,
